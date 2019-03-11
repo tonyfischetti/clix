@@ -33,6 +33,24 @@
 
 (defmacro explain (text &rest body)
   `(progn (format t "~A~%" ,text) ,@body))
+
+(defmacro or-die (message &rest body)
+  "anaphoric macro that binds err to the error"
+  `(handler-case
+     (progn
+       ,@body)
+     (error (err)
+       (progn
+        (format *error-output* "~A~%" ,message)
+        (sb-ext:quit :unix-status 1)))))
+
+
+(defmacro die-if-null (avar &rest therest)
+  `(when (not (and ,avar ,@therest))
+     (progn
+       (format *error-output* "Error: at least one of the arguments is NIL~%")
+       (sb-ext:quit :unix-status 1))))
+
 ;---------------------------------------------------------;
 
 
