@@ -45,7 +45,8 @@
 
 (defun die (message)
   (format *error-output* "~A~%" message)
-  (sb-ext:quit :unix-status 1))
+  (quit))
+  ; (sb-ext:quit :unix-status 1))
 
 ;---------------------------------------------------------;
 
@@ -108,6 +109,21 @@
        (close ,instream))))
 
 ;---------------------------------------------------------;
+
+
+(defun die (message &key (status 1))
+  (format *error-output* "~A~%" message)
+  #+clisp (ext:exit status)
+  #+sbcl  (sb-ext:quit :unix-status status))
+
+
+(defun cmdargs ()
+  (or 
+   #+CLISP (cons "program_name" *args*)
+   #+SBCL *posix-argv*  
+   #+LISPWORKS system:*line-arguments-list*
+   #+CMU extensions:*command-line-words*
+   nil))
 
 
 (defun clear ()
