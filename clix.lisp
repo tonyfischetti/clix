@@ -60,7 +60,7 @@
 (declaim (inline progress))
 (defun progress (index limit &key (interval 1) (where *standard-output*))
   (when (= 0 (mod index interval))
-    (format where "~A of ~A..... [~$]~%" index limit (* 100 (/ index limit)))))
+    (format where "~A of ~A..... [~$%]~%" index limit (* 100 (/ index limit)))))
 
 (defgeneric get-size (obj))
 
@@ -75,15 +75,18 @@
 
 
 (defmacro for-each ((a-thing &key (size? nil)) &body body)
-  `(let ((index!  -1)
-         (key!   nil)
-         (value! nil)
-         (size!  nil))
-    (when ,size? (setf size! (get-size ,a-thing)))
-    (etypecase ,a-thing
-      (hash-table     (for-each-hash   (index! key! value! ,a-thing) ,@body))
-      (vector         (for-each-vector (index! value! ,a-thing)      ,@body))
-      (list           (for-each-list   (index! value! ,a-thing)      ,@body)))))
+  ;doesn't variable capture now
+  (let ((tmp (gensym)))
+    `(let ((index!    -1)
+           (key!      nil)
+           (value!    nil)
+           (size!     nil)
+           (,tmp      ,a-thing))
+      (when ,size? (setf size! (get-size ,tmp)))
+      (etypecase ,tmp
+        (hash-table     (for-each-hash   (index! key! value! ,tmp) ,@body))
+        (vector         (for-each-vector (index! value! ,tmp)      ,@body))
+        (list           (for-each-list   (index! value! ,tmp)      ,@body))))))
 
 
 (defmacro for-each-list ((index item a-list) &body body)

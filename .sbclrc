@@ -18,3 +18,5 @@
     (ql:quickload "linedit")
     (funcall (intern "INSTALL-REPL" :linedit) :wrap-current t
                                               :eof-quits t)))
+
+; (sb-int:set-floating-point-modes :traps nil)
