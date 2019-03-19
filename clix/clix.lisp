@@ -9,7 +9,7 @@
 
 
 (defpackage :clix
-  (:use :common-lisp)
+  (:use :common-lisp :sb-ext)
   (:export :slurp
            :barf
            :explain
