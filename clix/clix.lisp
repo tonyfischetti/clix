@@ -8,9 +8,38 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-
-;---------------------------------------------------------;
-; IO
+(defpackage :clix
+  (:use :common-lisp)
+  (:export :slurp
+           :barf
+           :explain
+           :or-die
+           :die-if-null
+           :progress
+           :get-size
+           :for-each
+           :for-each-list
+           :for-each-vector
+           :for-each-hash
+           :for-each-line
+           :die
+           :cmdargs
+           :clear
+           :-<>
+           :eval-always
+           :abbr
+           :str-join
+           :substr
+           :aif
+           :interpose
+           :set-hash
+           :get-hash
+           :print-hash-table
+           :index!
+           :line!
+           :value!
+           :key!))
+(in-package :clix)
 
 (defun slurp (path)
   (with-open-file (stream path)
@@ -43,10 +72,6 @@
   `(when (not (and ,avar ,@therest))
      (die "Error: at least one of the arguments is NIL")))
 
-(defun die (message)
-  (format *error-output* "~A~%" message)
-  (quit))
-  ; (sb-ext:quit :unix-status 1))
 
 ;---------------------------------------------------------;
 
@@ -280,3 +305,4 @@
                           (pprint-newline :mandatory stream)
                           (princ "} " stream)))
   ht)
+
