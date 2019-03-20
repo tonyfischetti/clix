@@ -14,6 +14,7 @@
            :barf
            :explain
            :or-die
+           :err!
            :die-if-null
            :progress
            :get-size
@@ -26,6 +27,7 @@
            :cmdargs
            :clear
            :-<>
+           :<>
            :eval-always
            :abbr
            :str-join
@@ -38,7 +40,10 @@
            :index!
            :line!
            :value!
-           :key!))
+           :key!
+           :*clix-output-stream*
+           :clix-log
+           ))
 (in-package :clix)
 
 (defun slurp (path)
@@ -305,4 +310,23 @@
                           (pprint-newline :mandatory stream)
                           (princ "} " stream)))
   ht)
+
+
+(defparameter *clix-output-stream* *standard-output*)
+
+(defun clix-log (stream char)
+  (declare (ignore char))
+  (multiple-value-bind (second minute hour date month year day-of-week dst-p tz) (get-decoded-time)
+    (let ((sexp    (read stream t))
+          (thetime (get-universal-time)))
+      ; (print sexp)
+      `(progn
+         (format *clix-output-stream*
+                 "[~A-~A-~A ~2,'0d:~2,'0d:~2,'0d]: ~A~%"
+                 ,year ,month ,date ,hour ,minute ,second
+                 (write-to-string ',sexp))
+         (finish-output *clix-output-stream*)
+         ,sexp))))
+
+(set-macro-character #\$ #'clix-log)
 

@@ -67,7 +67,8 @@
                     (progn
                       (format t "~c[0m" #\ESC)
                       (throw 'form-done 
-                             (format nil "(ignore-errors ~A)" str)))))))))))
+                             str))))))))))
+                             ; (format nil "(ignore-errors ~A)" str)))))))))))
 ; (without-output-to-string (stream)
 ;                           (format stream "(ignore-errors (~A))" str)))))))))))
 ; str)))))))))
