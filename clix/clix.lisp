@@ -42,6 +42,7 @@
            :value!
            :key!
            :*clix-output-stream*
+           :*clix-log-level*
            :clix-log
            ))
 (in-package :clix)
@@ -313,6 +314,7 @@
 
 
 (defparameter *clix-output-stream* *standard-output*)
+(defparameter *clix-log-level* 1)
 
 
 
@@ -323,7 +325,12 @@
   ; (remove-if (lambda (x) (or (char= #\Linefeed x) (char= #\Return x))) thetimeoutput))
 
 
-(defun clix-log (stream char arg)
+
+;;;;;; A HAVE TO REFACTOR THIS REALLY BAD
+;;;;;; I JUST WANNA TRY SOMETHING OUT RIGHT QUICK
+
+
+(defun clix-log-verbose (stream char arg)
   ;;;;;; HOW UNHYGENIC IS THIS???!!
   (declare (ignore char))
   (multiple-value-bind (second minute hour date month year day-of-week dst-p tz) (get-decoded-time)
@@ -337,7 +344,7 @@
                  "--------------------~%[~A-~A-~A ~2,'0d:~2,'0d:~2,'0d]~%~%FORM:~%~A~%"
                  ,year ,month ,date ,hour ,minute ,second
                  ; (write-to-string ',sexp))
-                 (format nil "~S~%" ',sexp))
+                 (format nil "λ ~S~%" ',sexp))
          (let ((daoutputstream (make-string-output-stream)))
            (let ((*trace-output* daoutputstream))
              (setq thereturnvalue (progn (time ,sexp))))
@@ -348,4 +355,71 @@
          thereturnvalue))))
 
 
+
+
+(defun clix-log-just-echo (stream char arg)
+  ;;;;;; HOW UNHYGENIC IS THIS???!!
+  (declare (ignore char))
+  (multiple-value-bind (second minute hour date month year day-of-week dst-p tz) (get-decoded-time)
+    (let ((sexp               (read stream t))
+          (thetime            (get-universal-time))
+          (thereturnvalue     nil)
+          (thetimingresults   nil)
+          (daoutputstream     (make-string-output-stream)))
+      `(progn
+         (format *clix-output-stream* "~%λ ~S~%" ',sexp)
+         (let ((daoutputstream (make-string-output-stream)))
+           (let ((*trace-output* daoutputstream))
+             (setq thereturnvalue (progn (time ,sexp))))
+               (setq thetimingresults (prettify-time-output (get-output-stream-string daoutputstream))))
+         ; (format *clix-output-stream* "RETURNED:~%~A~%" thereturnvalue)
+         ; (format *clix-output-stream* "~%~A~%--------------------~%~%~%" thetimingresults)
+         (finish-output *clix-output-stream*)
+         thereturnvalue))))
+
+
+(defun clix-log (stream char arg)
+  (cond ((= *clix-log-level* 2)    (clix-log-verbose   stream char arg))
+        ((= *clix-log-level* 1)    (clix-log-just-echo stream char arg))
+        (                          nil)))
+
+
 (set-dispatch-macro-character #\# #\! #'clix-log)
+
+
+
+
+;
+; (defun clix-log3 (stream char)
+;   ;;;;;; HOW UNHYGENIC IS THIS???!!
+;   (declare (ignore char))
+;   (multiple-value-bind (second minute hour date month year day-of-week dst-p tz) (get-decoded-time)
+;     (let ((sexp               (read stream t))
+;           (thetime            (get-universal-time))
+;           (thereturnvalue     nil)
+;           (thetimingresults   nil)
+;           (daoutputstream     (make-string-output-stream)))
+;       `(progn
+;          (format *clix-output-stream*
+;                  "--------------------~%[~A-~A-~A ~2,'0d:~2,'0d:~2,'0d]~%~%FORM:~%~A~%"
+;                  ,year ,month ,date ,hour ,minute ,second
+;                  ; (write-to-string ',sexp))
+;                  (format nil "λ ~S~%" ',sexp))
+;          (let ((daoutputstream (make-string-output-stream)))
+;            (let ((*trace-output* daoutputstream))
+;              (setq thereturnvalue (progn (time ,sexp))))
+;                (setq thetimingresults (prettify-time-output (get-output-stream-string daoutputstream))))
+;          (format *clix-output-stream* "RETURNED:~%~A~%" thereturnvalue)
+;          (format *clix-output-stream* "~%~A~%--------------------~%~%~%" thetimingresults)
+;          (finish-output *clix-output-stream*)
+;          thereturnvalue))))
+;
+;
+;
+;
+;
+; (set-macro-character #\💯 #'clix-log3)
+;
+;
+;
+;
