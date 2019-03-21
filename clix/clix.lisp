@@ -151,9 +151,9 @@
 
 
 (defun cmdargs ()
-  (or 
+  (or
    #+CLISP (cons "program_name" *args*)
-   #+SBCL *posix-argv*  
+   #+SBCL *posix-argv*
    #+LISPWORKS system:*line-arguments-list*
    #+CMU extensions:*command-line-words*
    nil))
@@ -314,19 +314,38 @@
 
 (defparameter *clix-output-stream* *standard-output*)
 
-(defun clix-log (stream char)
+
+
+(defun prettify-time-output (thetimeoutput)
+  ; (format t "~A~%" (length thetimeoutput))
+  ;(remove-if (lambda (x) (char= #\Return x)) thetimeoutput)
+  (subseq thetimeoutput 0 (- (length thetimeoutput) 4)))
+  ; (remove-if (lambda (x) (or (char= #\Linefeed x) (char= #\Return x))) thetimeoutput))
+
+
+(defun clix-log (stream char arg)
+  ;;;;;; HOW UNHYGENIC IS THIS???!!
   (declare (ignore char))
   (multiple-value-bind (second minute hour date month year day-of-week dst-p tz) (get-decoded-time)
-    (let ((sexp    (read stream t))
-          (thetime (get-universal-time)))
-      ; (print sexp)
+    (let ((sexp               (read stream t))
+          (thetime            (get-universal-time))
+          (thereturnvalue     nil)
+          (thetimingresults   nil)
+          (daoutputstream     (make-string-output-stream)))
       `(progn
          (format *clix-output-stream*
-                 "[~A-~A-~A ~2,'0d:~2,'0d:~2,'0d]: ~A~%"
+                 "--------------------~%[~A-~A-~A ~2,'0d:~2,'0d:~2,'0d]~%~%FORM:~%~A~%"
                  ,year ,month ,date ,hour ,minute ,second
-                 (write-to-string ',sexp))
+                 ; (write-to-string ',sexp))
+                 (format nil "~S~%" ',sexp))
+         (let ((daoutputstream (make-string-output-stream)))
+           (let ((*trace-output* daoutputstream))
+             (setq thereturnvalue (progn (time ,sexp))))
+               (setq thetimingresults (prettify-time-output (get-output-stream-string daoutputstream))))
+         (format *clix-output-stream* "RETURNED:~%~A~%" thereturnvalue)
+         (format *clix-output-stream* "~%~A~%--------------------~%~%~%" thetimingresults)
          (finish-output *clix-output-stream*)
-         ,sexp))))
+         thereturnvalue))))
 
-(set-macro-character #\$ #'clix-log)
 
+(set-dispatch-macro-character #\# #\! #'clix-log)
