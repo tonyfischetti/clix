@@ -31,19 +31,19 @@
   (list "-shared" "-fPIC")
   #+(or darwin macosx)
   (append
-   (list "-dynamic"  "-bundle")
-   #+(or x86 x86-64)
-   (list "-arch" "x86_64" "-arch" "i386")
-   #-sbcl
-   (list "/usr/lib/bundle1.o" "-flat_namespace" "-undefined" "suppress")))
+    (list "-dynamic"  "-bundle")
+    #+(or x86 x86-64)
+    (list "-arch" "x86_64" "-arch" "i386")
+    #-sbcl
+    (list "/usr/lib/bundle1.o" "-flat_namespace" "-undefined" "suppress")))
 
 ;;; Separate class so that we don't mess up other packages
 (defclass uffi-c-source-file (c-source-file) ())
 
 (defmethod output-files ((o compile-op) (c uffi-c-source-file))
   (list (make-pathname :name (component-name c)
-		       :type #-(or darwin macosx) "so" #+(or darwin macosx) "dylib"
-		       :defaults (component-pathname c))))
+                       :type #-(or darwin macosx) "so" #+(or darwin macosx) "dylib"
+                       :defaults (component-pathname c))))
 
 (defmethod perform ((o load-op) (c uffi-c-source-file))
   (let ((loader (intern (symbol-name '#:load-foreign-library) :uffi)))
@@ -52,39 +52,39 @@
 
 (defmethod perform ((o compile-op) (c uffi-c-source-file))
   (unless (zerop (run-shell-command "~A ~A ~{~A ~}-o ~A"
-				    *gcc*
-				    (namestring (component-pathname c))
-				    *gcc-options*
-				    (namestring (car (output-files o c)))))
+                                    *gcc*
+                                    (namestring (component-pathname c))
+                                    *gcc-options*
+                                    (namestring (car (output-files o c)))))
     (error 'operation-error :component c :operation o)))
 
 (defsystem :linedit
-    :version "0.17.0"
-    :depends-on (:uffi :terminfo :osicat)
-    :components
-  (;; Common
-   (:file "packages")
-   (:file "utility-functions" :depends-on ("packages"))
-   (:file "utility-macros" :depends-on ("packages" "utility-functions"))
-   (:file "matcher" :depends-on ("packages"))
+           :version "0.17.0"
+           :depends-on (:uffi :terminfo :osicat :sb-posix :cl-ppcre)
+           :components
+           (;; Common
+            (:file "packages")
+            (:file "utility-functions" :depends-on ("packages"))
+            (:file "utility-macros" :depends-on ("packages" "utility-functions"))
+            (:file "matcher" :depends-on ("packages"))
 
-   ;; Backend
-   (:file "backend" :depends-on ("utility-macros"))
-   (:uffi-c-source-file "terminal_glue")
-   (:file "terminal-translations" :depends-on ("packages"))
-   (:file "terminal" :depends-on ("terminal-translations" "backend" "terminal_glue"))
-   (:file "smart-terminal" :depends-on ("terminal" "matcher"))
-   (:file "dumb-terminal" :depends-on ("terminal"))
+            ;; Backend
+            (:file "backend" :depends-on ("utility-macros"))
+            (:uffi-c-source-file "terminal_glue")
+            (:file "terminal-translations" :depends-on ("packages"))
+            (:file "terminal" :depends-on ("terminal-translations" "backend" "terminal_glue"))
+            (:file "smart-terminal" :depends-on ("terminal" "matcher"))
+            (:file "dumb-terminal" :depends-on ("terminal"))
 
-   ;; Editor
-   (:file "rewindable" :depends-on ("utility-macros"))
-   (:file "line" :depends-on ("utility-macros"))
-   (:file "buffer" :depends-on ("utility-macros"))
-   (:file "command-keys" :depends-on ("packages"))
-   (:uffi-c-source-file "signals")
-   (:file "editor" :depends-on ("backend" "rewindable" "signals"
-				"line" "buffer" "command-keys"))
-   (:file "main" :depends-on ("editor"))
-   (:file "complete" :depends-on ("utility-macros"))
-   (:file "command-functions" :depends-on ("editor"))
-   #+sbcl (:file "sbcl-repl" :depends-on ("main"))))
+            ;; Editor
+            (:file "rewindable" :depends-on ("utility-macros"))
+            (:file "line" :depends-on ("utility-macros"))
+            (:file "buffer" :depends-on ("utility-macros"))
+            (:file "command-keys" :depends-on ("packages"))
+            (:uffi-c-source-file "signals")
+            (:file "editor" :depends-on ("backend" "rewindable" "signals"
+                                         "line" "buffer" "command-keys"))
+            (:file "main" :depends-on ("editor"))
+            (:file "complete" :depends-on ("utility-macros"))
+            (:file "command-functions" :depends-on ("editor"))
+            #+sbcl (:file "sbcl-repl" :depends-on ("main"))))

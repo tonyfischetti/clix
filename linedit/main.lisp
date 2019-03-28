@@ -1,5 +1,5 @@
 ;; Copyright (c) 2003 Nikodemus Siivola
-;; 
+;;
 ;; Permission is hereby granted, free of charge, to any person obtaining
 ;; a copy of this software and associated documentation files (the
 ;; "Software"), to deal in the Software without restriction, including
@@ -7,10 +7,10 @@
 ;; distribute, sublicense, and/or sell copies of the Software, and to
 ;; permit persons to whom the Software is furnished to do so, subject to
 ;; the following conditions:
-;; 
+;;
 ;; The above copyright notice and this permission notice shall be included
 ;; in all copies or substantial portions of the Software.
-;; 
+;;
 ;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 ;; EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 ;; MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -61,17 +61,35 @@
                                                 (read-from-string str)
                                                 (error 'end-of-file))
                                               (delete-package *package*)))
-                              (end-of-file () 
+                              (end-of-file ()
                                            eof-marker))))
                   (unless (eq eof-marker form)
                     (progn
                       (format t "~c[0m" #\ESC)
-                      (throw 'form-done 
+                      (log-in-history str)
+                      (throw 'form-done
                              str))))))))))
                              ; (format nil "(ignore-errors ~A)" str)))))))))))
 ; (without-output-to-string (stream)
 ;                           (format stream "(ignore-errors (~A))" str)))))))))))
 ; str)))))))))
+
+(defvar *unix-epoch-difference*
+  (encode-universal-time 0 0 0 1 1 1970 0))
+
+(defun universal-to-unix-time (universal-time)
+  (- universal-time *unix-epoch-difference*))
+
+(defun log-in-history (message &key (logfile "~/.sbcl_history"))
+  (let ((thecwd        (sb-posix:getcwd))
+        (theuname      (sb-ext:posix-getenv "ZUNAME"))
+        (thehostname   (sb-ext:posix-getenv "ZHOSTNAME"))
+        (thecontext    (sb-ext:posix-getenv "ZCONTEXT"))
+        (stripped      (cl-ppcre:regex-replace-all "\\n" message " "))
+        ; (stripped      (remove-if (lambda (x) (or (char= #\Newline x) (char= #\Return x))) message))
+        (timestamp     (universal-to-unix-time (get-universal-time))))
+    (with-open-file (stream logfile :direction :output :if-exists :append :if-does-not-exist :create)
+      (format stream "SBCL:~A:~A:~A:~A:~11,' d:0;~A~%" theuname thehostname thecwd thecontext timestamp stripped))))
 
 (defun semicolon-reader (stream char)
   (declare (ignore char))
