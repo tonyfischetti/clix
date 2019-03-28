@@ -89,7 +89,7 @@
         ; (stripped      (remove-if (lambda (x) (or (char= #\Newline x) (char= #\Return x))) message))
         (timestamp     (universal-to-unix-time (get-universal-time))))
     (with-open-file (stream logfile :direction :output :if-exists :append :if-does-not-exist :create)
-      (format stream "SBCL:~A:~A:~A:~A:~11,' d:0;~A~%" theuname thehostname thecwd thecontext timestamp stripped))))
+      (format stream ":SBCL:~A:~A:~A:~A:~11,' d:0;~A~%" theuname thehostname thecwd thecontext timestamp stripped))))
 
 (defun semicolon-reader (stream char)
   (declare (ignore char))
