@@ -133,11 +133,11 @@
   `(let ((,index -1)) (loop for ,key being the hash-keys of ,a-hash
                             do (progn (incf ,index) (setf ,value (gethash ,key ,a-hash)) ,@body))))
 
-(defmacro for-each-line ((afilename) &body body)
+(defmacro for-each-line ((afilename &key (external-format :default)) &body body)
   (let ((instream (gensym)))
     `(let ((index!  -1)
            (line!  nil)
-           (,instream (open ,afilename :if-does-not-exist nil)))
+           (,instream (open ,afilename :if-does-not-exist nil :external-format ,external-format)))
        (loop for line! = (read-line ,instream nil)
              while line! do (progn (incf index!) ,@body))
        (close ,instream))))
