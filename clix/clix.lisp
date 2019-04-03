@@ -44,40 +44,120 @@
            :*clix-output-stream*
            :*clix-log-level*
            :clix-log
+           :λ
            ))
 (in-package :clix)
 
-(defun slurp (path)
-  (with-open-file (stream path)
-    (let ((data (make-string (file-length stream))))
-      (read-sequence data stream)
-      data)))
-
-(defun barf (path contents &key (printfn #'write-string) (overwrite nil))
-  (with-open-file (stream path :direction :output
-                          :if-exists (if overwrite :supersede :append)
-                          :if-does-not-exist :create)
-    (funcall printfn contents stream)))
 ;---------------------------------------------------------;
+
+
+
+
+;---------------------------------------------------------;
+; parameters
+
+; (defparameter *clix-output-stream* *standard-output*)
+(defparameter *clix-output-stream* *terminal-io*)
+(defparameter *clix-log-level* 1)
+
+;---------------------------------------------------------;
+
+
+
 
 ;---------------------------------------------------------;
 ; convenience
 
-(defmacro explain (text &rest body)
-  `(progn (format t "~A~%" ,text) ,@body))
+(defun slurp (path)
+  "Reads file at PATH into a single string"
+  (with-open-file (stream path :if-does-not-exist :error)
+    (let ((data (make-string (file-length stream))))
+      (read-sequence data stream)
+      data)))
+
+
+(defun barf (path contents &key (printfn #'write-string) (overwrite nil))
+  "Outputs CONTENTS into filename PATH with function PRINTFN
+   (default WRITE-STRING) and appends by default (controllable by
+   by boolean OVERWRITE)"
+  (with-open-file (stream path :direction :output
+                          :if-exists (if overwrite :supersede :append)
+                          :if-does-not-exist :create)
+    (funcall printfn contents stream)))
+
+
+(defmacro explain (message &rest body)
+  "prints MESSAGE to standard output before eval-ing BODY"
+  `(progn (format t "~A~%" ,message) ,@body))
+
 
 (defmacro or-die (message &rest body)
-  "anaphoric macro that binds err! to the error"
+  "anaphoric macro that binds ERR! to the error"
   `(handler-case
      (progn
        ,@body)
      (error (err!)
        (die (format nil "~A~%" ,message)))))
 
+
 (defmacro die-if-null (avar &rest therest)
+  "Calls CLIX:DIE if any of the arguments are NIL"
   `(when (not (and ,avar ,@therest))
      (die "Error: at least one of the arguments is NIL")))
 
+(defun die (message &key (status 1))
+  "Prints MESSAGE to *ERROR-OUTPUT* and quits with a STATUS (default 1)"
+  (format *error-output* "~A~%" message)
+  #+clisp (ext:exit status)
+  #+sbcl  (sb-ext:quit :unix-status status))
+
+
+(declaim (inline set-hash))
+(defun set-hash (ht key val)
+  "Set VAL at KEY in hash-table HT."
+  (setf (gethash key ht) val))
+
+
+(declaim (inline get-hash))
+(defun get-hash (ht key)
+  "Get value at KEY in hash-table HT"
+  (gethash key ht))
+
+
+(declaim (inline rem-hash))
+(defun rem-hash (ht key)
+  "Remove KEY in hash-table HT"
+  (remhash key ht))
+
+
+(defun cmdargs ()
+  "A multi-implementation function to return argv (program name is CAR)"
+  (or
+   #+CLISP (cons "program_name" *args*)
+   #+SBCL *posix-argv*
+   #+LISPWORKS system:*line-arguments-list*
+   #+CMU extensions:*command-line-words*
+   nil))
+
+
+(defun clear ()
+  "A multi-implementation function to clear the terminal screen"
+   #+clisp    (shell "clear")
+   #+ecl      (si:system "clear")
+   #+sbcl     (sb-ext:run-program "/bin/sh" (list "-c" "clear") :input nil :output *standard-output*)
+   #+clozure  (ccl:run-program "/bin/sh" (list "-c" "clear") :input nil :output *standard-output*))
+
+
+(defmacro -<> (expr &rest forms)
+  "Threading macro (put <> where the argument should be
+   Stolen from https://github.com/sjl/cl-losh/blob/master/src/control-flow.lisp"
+  `(let* ((<> ,expr)
+          ,@(mapcar (lambda (form)
+                      (if (symbolp form)
+                        `(<> (,form <>))
+                        `(<> ,form)))
+                    forms))
+     <>))
 
 ;---------------------------------------------------------;
 
@@ -86,7 +166,7 @@
 
 
 ;---------------------------------------------------------;
-; iterator
+; for-each and friends
 
 (declaim (inline progress))
 (defun progress (index limit &key (interval 1) (where *standard-output*))
@@ -96,7 +176,7 @@
 (defgeneric get-size (obj))
 
 (defmethod get-size ((alist list))
-  (length alist))
+  (list-length alist))
 
 (defmethod get-size ((ahash hash-table))
   (hash-table-count ahash))
@@ -134,10 +214,12 @@
                             do (progn (incf ,index) (setf ,value (gethash ,key ,a-hash)) ,@body))))
 
 (defmacro for-each-line ((afilename &key (external-format :default)) &body body)
-  (let ((instream (gensym)))
-    `(let ((index!  -1)
-           (line!  nil)
-           (,instream (open ,afilename :if-does-not-exist nil :external-format ,external-format)))
+  (let ((instream   (gensym))
+        (resolvedfn (gensym)))
+    `(let* ((index!        -1)
+            (line!         nil)
+            (,resolvedfn  ,afilename)
+            (,instream    (open ,resolvedfn :if-does-not-exist :error :external-format ,external-format)))
        (loop for line! = (read-line ,instream nil)
              while line! do (progn (incf index!) ,@body))
        (close ,instream))))
@@ -145,44 +227,10 @@
 ;---------------------------------------------------------;
 
 
-(defun die (message &key (status 1))
-  (format *error-output* "~A~%" message)
-  #+clisp (ext:exit status)
-  #+sbcl  (sb-ext:quit :unix-status status))
 
 
-(defun cmdargs ()
-  (or
-   #+CLISP (cons "program_name" *args*)
-   #+SBCL *posix-argv*
-   #+LISPWORKS system:*line-arguments-list*
-   #+CMU extensions:*command-line-words*
-   nil))
-
-
-(defun clear ()
-   "A multi-implementation function equivalent for the C function system"
-   #+clisp (shell "clear")
-   #+ecl (si:system "clear")
-   #+sbcl (sb-ext:run-program "/bin/sh" (list "-c" "clear") :input nil :output *standard-output*)
-   #+clozure (ccl:run-program "/bin/sh" (list "-c" "clear") :input nil :output *standard-output*))
-
-
-(defmacro -<> (expr &rest forms)
-  "Stolen from https://github.com/sjl/cl-losh/blob/master/src/control-flow.lisp"
-  `(let* ((<> ,expr)
-          ,@(mapcar (lambda (form)
-                      (if (symbolp form)
-                        `(<> (,form <>))
-                        `(<> ,form)))
-                    forms))
-     <>))
-
-
-; ---
 
 ;---------------------------------------------------------;
-
 ; Stolen or inspired by https://github.com/vseloved/rutils/
 
 (define-condition rutils-style-warning (simple-condition style-warning) ())
@@ -245,6 +293,7 @@
 ; (abbr set# sethash)
 ; (abbr getset# getsethash)
 ; (abbr rem# remhash)
+; (abbr λ lambda)
 
 (defun str-join (delim strings)
   "Join STRINGS with DELIM."
@@ -272,15 +321,6 @@
                   acc)))
     (cdr (rec list nil))))
 
-(declaim (inline set-hash))
-(defun set-hash (ht key val)
-  "Set VAL at KEY in hash-table HT."
-  (setf (gethash key ht) val))
-
-(declaim (inline get-hash))
-(defun get-hash (ht key)
-  "Get value at key in hashtable ht"
-  (gethash key ht))
 
 (defun print-hash-table (ht &optional (stream *standard-output*))
   "Pretty print hash-table HT to STREAM."
@@ -312,11 +352,13 @@
                           (princ "} " stream)))
   ht)
 
-
-(defparameter *clix-output-stream* *standard-output*)
-(defparameter *clix-log-level* 1)
+;---------------------------------------------------------;
 
 
+
+
+;---------------------------------------------------------;
+; Experimental logging and reader macros
 
 (defun prettify-time-output (thetimeoutput)
   ; (format t "~A~%" (length thetimeoutput))
@@ -355,8 +397,6 @@
          thereturnvalue))))
 
 
-
-
 (defun clix-log-just-echo (stream char arg)
   ;;;;;; HOW UNHYGENIC IS THIS???!!
   (declare (ignore char))
@@ -388,38 +428,5 @@
 
 
 
-
-;
-; (defun clix-log3 (stream char)
-;   ;;;;;; HOW UNHYGENIC IS THIS???!!
-;   (declare (ignore char))
-;   (multiple-value-bind (second minute hour date month year day-of-week dst-p tz) (get-decoded-time)
-;     (let ((sexp               (read stream t))
-;           (thetime            (get-universal-time))
-;           (thereturnvalue     nil)
-;           (thetimingresults   nil)
-;           (daoutputstream     (make-string-output-stream)))
-;       `(progn
-;          (format *clix-output-stream*
-;                  "--------------------~%[~A-~A-~A ~2,'0d:~2,'0d:~2,'0d]~%~%FORM:~%~A~%"
-;                  ,year ,month ,date ,hour ,minute ,second
-;                  ; (write-to-string ',sexp))
-;                  (format nil "λ ~S~%" ',sexp))
-;          (let ((daoutputstream (make-string-output-stream)))
-;            (let ((*trace-output* daoutputstream))
-;              (setq thereturnvalue (progn (time ,sexp))))
-;                (setq thetimingresults (prettify-time-output (get-output-stream-string daoutputstream))))
-;          (format *clix-output-stream* "RETURNED:~%~A~%" thereturnvalue)
-;          (format *clix-output-stream* "~%~A~%--------------------~%~%~%" thetimingresults)
-;          (finish-output *clix-output-stream*)
-;          thereturnvalue))))
-;
-;
-;
-;
-;
 ; (set-macro-character #\💯 #'clix-log3)
-;
-;
-;
-;
+
