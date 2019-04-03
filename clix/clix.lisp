@@ -13,6 +13,8 @@
   (:export :slurp
            :barf
            :explain
+           :die
+           :advise
            :or-die
            :err!
            :die-if-null
@@ -23,7 +25,6 @@
            :for-each-vector
            :for-each-hash
            :for-each-line
-           :die
            :cmdargs
            :clear
            :-<>
@@ -44,7 +45,6 @@
            :*clix-output-stream*
            :*clix-log-level*
            :clix-log
-           :λ
            ))
 (in-package :clix)
 
@@ -91,13 +91,18 @@
   `(progn (format t "~A~%" ,message) ,@body))
 
 
-(defmacro or-die (message &rest body)
-  "anaphoric macro that binds ERR! to the error"
+
+(defmacro or-die ((message &key (errfun #'die)) &body body)
+  "anaphoric macro that binds ERR! to the error
+   It takes a MESSAGE with can include ERR! (via
+   (format nil...) for example) It also takes ERRFUN
+   which it will FUNCALL with the MESSAGE. The default
+   is to DIE, but you can, for example, PRINC instead"
   `(handler-case
      (progn
        ,@body)
      (error (err!)
-       (die (format nil "~A~%" ,message)))))
+       (funcall ,errfun (format nil "~A" ,message)))))
 
 
 (defmacro die-if-null (avar &rest therest)
@@ -105,11 +110,17 @@
   `(when (not (and ,avar ,@therest))
      (die "Error: at least one of the arguments is NIL")))
 
+
 (defun die (message &key (status 1))
   "Prints MESSAGE to *ERROR-OUTPUT* and quits with a STATUS (default 1)"
   (format *error-output* "~A~%" message)
   #+clisp (ext:exit status)
   #+sbcl  (sb-ext:quit :unix-status status))
+
+(defun advise (message)
+  "Prints MESSAGE to *ERROR-OUTPUT* but resumes
+   (for use with OR-DIE's ERRFUN)"
+   (format *error-output* "~A~%" message))
 
 
 (declaim (inline set-hash))

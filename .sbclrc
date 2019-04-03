@@ -11,12 +11,22 @@
 
 
 (if (member "--no-linedit" sb-ext:*posix-argv* :test 'equal)
-  (setf sb-ext:*posix-argv* 
+  (setf sb-ext:*posix-argv*
         (remove "--no-linedit" sb-ext:*posix-argv* :test 'equal))
   (when (interactive-stream-p *terminal-io*)
     (require :sb-aclrepl)
     (ql:quickload "linedit")
     (funcall (intern "INSTALL-REPL" :linedit) :wrap-current t
                                               :eof-quits t)))
+
+(when (member "--with-clix" sb-ext:*posix-argv* :test 'equal)
+  (ql:register-local-projects)
+  (ql:quickload :clix)
+  (use-package :clix))
+
+(when (member "--no-warnings" sb-ext:*posix-argv* :test 'equal)
+  (declaim (sb-ext:muffle-conditions cl:warning))
+  (declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
+  (setf sb-debug:*debug-beginner-help-p* nil))
 
 ; (sb-int:set-floating-point-modes :traps nil)
