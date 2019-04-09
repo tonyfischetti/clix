@@ -25,6 +25,7 @@
            :for-each-vector
            :for-each-hash
            :for-each-line
+           :for-each-in-stream
            :cmdargs
            :clear
            :-<>
@@ -234,7 +235,6 @@
   `(let ((,index -1)) (loop for ,key being the hash-keys of ,a-hash
                             do (progn (incf ,index) (setf ,value (gethash ,key ,a-hash)) (block this-loop! ,@body)))))
 
-
 (defmacro for-each-line ((afilename &key (external-format :default)) &body body)
   (let ((instream   (gensym))
         (resolvedfn (gensym)))
@@ -245,6 +245,16 @@
        (loop for line! = (read-line ,instream nil)
              while line! do (progn (incf index!) (block this-loop! ,@body)))
        (close ,instream))))
+
+(defmacro for-each-in-stream (astream &body body)
+  (let ((instream   (gensym)))
+    `(let* ((index!        -1)
+            (line!         nil)
+            (,instream    ,astream))
+       (loop for line! = (read-line ,instream nil)
+             while line! do (progn (incf index!) (block this-loop! ,@body)))
+       (close ,instream))))
+
 
 ;---------------------------------------------------------;
 
