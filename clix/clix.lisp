@@ -42,9 +42,14 @@
            :line!
            :value!
            :key!
+           :this-loop!
+           :clix-log
            :*clix-output-stream*
            :*clix-log-level*
-           :clix-log
+           :+yellow-bold+
+           :+green-bold+
+           :+cyan-bold+
+           :+reset-terminal-col+
            ))
 (in-package :clix)
 
@@ -59,6 +64,11 @@
 ; (defparameter *clix-output-stream* *standard-output*)
 (defparameter *clix-output-stream* *terminal-io*)
 (defparameter *clix-log-level* 1)
+
+(defvar +yellow-bold+         (format nil "~c[33;1m" #\ESC))
+(defvar +green-bold+          (format nil "~c[32;1m" #\ESC))
+(defvar +cyan-bold+           (format nil "~c[36;1m" #\ESC))
+(defvar +reset-terminal-col+  (format nil "~c[0m" #\ESC))
 
 ;---------------------------------------------------------;
 
@@ -212,17 +222,18 @@
 
 
 (defmacro for-each-list ((index item a-list) &body body)
-  `(let ((,index -1)) (dolist (,item ,a-list) (incf ,index) ,@body)))
+  `(let ((,index -1)) (dolist (,item ,a-list) (incf ,index) (block this-loop! ,@body))))
 
 
 (defmacro for-each-vector ((index item a-vector) &body body)
   `(let ((,index -1)) (loop for ,item across ,a-vector
-                            do (progn (incf ,index) ,@body))))
+                            do (progn (incf ,index) (block this-loop! ,@body)))))
 
 
 (defmacro for-each-hash ((index key value a-hash) &body body)
   `(let ((,index -1)) (loop for ,key being the hash-keys of ,a-hash
-                            do (progn (incf ,index) (setf ,value (gethash ,key ,a-hash)) ,@body))))
+                            do (progn (incf ,index) (setf ,value (gethash ,key ,a-hash)) (block this-loop! ,@body)))))
+
 
 (defmacro for-each-line ((afilename &key (external-format :default)) &body body)
   (let ((instream   (gensym))
@@ -232,7 +243,7 @@
             (,resolvedfn  ,afilename)
             (,instream    (open ,resolvedfn :if-does-not-exist :error :external-format ,external-format)))
        (loop for line! = (read-line ,instream nil)
-             while line! do (progn (incf index!) ,@body))
+             while line! do (progn (incf index!) (block this-loop! ,@body)))
        (close ,instream))))
 
 ;---------------------------------------------------------;
