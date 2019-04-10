@@ -31,6 +31,9 @@
            :-<>
            :<>
            :zsh
+           :universal->unix-time
+           :unix->universal-time
+           :get-unix-time
            :eval-always
            :abbr
            :str-join
@@ -75,6 +78,8 @@
 
 (defparameter *clix-zsh* "/usr/local/bin/zsh")
 
+(defvar *unix-epoch-difference*
+  (encode-universal-time 0 0 0 1 1 1970 0))
 
 ;---------------------------------------------------------;
 
@@ -187,11 +192,7 @@
      <>))
 
 
-(defun zsh (acommand &key (err-fun #'(lambda (code stderr)
-                                       (error
-                                         (format nil "~A (~A)"
-                                                 stderr code))))
-                          (echo nil))
+(defun zsh (acommand &key (err-fun #'(lambda (code stderr) (error (format nil "~A (~A)" stderr code)))) (echo nil))
   (flet ((strip (astring)
     (if (string= "" astring)
       astring
@@ -209,6 +210,17 @@
       (values (strip (get-output-stream-string outs))
               (strip (get-output-stream-string errs))
               retcode))))
+
+
+(defun universal->unix-time (universal-time)
+  (- universal-time *unix-epoch-difference*))
+
+(defun unix->universal-time (unix-time)
+  (+ unix-time *unix-epoch-difference*))
+
+(defun get-unix-time ()
+  (universal->unix-time (get-universal-time)))
+
 
 ;---------------------------------------------------------;
 
