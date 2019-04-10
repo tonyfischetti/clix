@@ -30,6 +30,7 @@
            :clear
            :-<>
            :<>
+           :zsh
            :eval-always
            :abbr
            :str-join
@@ -47,6 +48,7 @@
            :clix-log
            :*clix-output-stream*
            :*clix-log-level*
+           :*clix-zsh*
            :+yellow-bold+
            :+green-bold+
            :+cyan-bold+
@@ -70,6 +72,9 @@
 (defvar +green-bold+          (format nil "~c[32;1m" #\ESC))
 (defvar +cyan-bold+           (format nil "~c[36;1m" #\ESC))
 (defvar +reset-terminal-col+  (format nil "~c[0m" #\ESC))
+
+(defparameter *clix-zsh* "/usr/local/bin/zsh")
+
 
 ;---------------------------------------------------------;
 
@@ -180,6 +185,30 @@
                         `(<> ,form)))
                     forms))
      <>))
+
+
+(defun zsh (acommand &key (err-fun #'(lambda (code stderr)
+                                       (error
+                                         (format nil "~A (~A)"
+                                                 stderr code))))
+                          (echo nil))
+  (flet ((strip (astring)
+    (if (string= "" astring)
+      astring
+      (subseq astring 0 (- (length astring) 1)))))
+    (when echo
+      (format t "$ ~A~%" acommand))
+    (let* ((outs        (make-string-output-stream))
+           (errs        (make-string-output-stream))
+           (theprocess  (run-program *clix-zsh* `("-c" ,acommand)
+                                     :output outs
+                                     :error  errs))
+           (retcode     (process-exit-code theprocess)))
+      (when (> retcode 0)
+        (funcall err-fun retcode (strip (get-output-stream-string errs))))
+      (values (strip (get-output-stream-string outs))
+              (strip (get-output-stream-string errs))
+              retcode))))
 
 ;---------------------------------------------------------;
 
