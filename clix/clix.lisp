@@ -192,24 +192,25 @@
      <>))
 
 
-(defun zsh (acommand &key (err-fun #'(lambda (code stderr) (error (format nil "~A (~A)" stderr code)))) (echo nil))
+(defun zsh (acommand &key (dry-run nil) (err-fun #'(lambda (code stderr) (error (format nil "~A (~A)" stderr code)))) (echo nil))
   (flet ((strip (astring)
     (if (string= "" astring)
       astring
       (subseq astring 0 (- (length astring) 1)))))
-    (when echo
+    (when (or echo dry-run)
       (format t "$ ~A~%" acommand))
-    (let* ((outs        (make-string-output-stream))
-           (errs        (make-string-output-stream))
-           (theprocess  (run-program *clix-zsh* `("-c" ,acommand)
-                                     :output outs
-                                     :error  errs))
-           (retcode     (process-exit-code theprocess)))
-      (when (> retcode 0)
-        (funcall err-fun retcode (strip (get-output-stream-string errs))))
-      (values (strip (get-output-stream-string outs))
-              (strip (get-output-stream-string errs))
-              retcode))))
+    (unless dry-run
+      (let* ((outs        (make-string-output-stream))
+             (errs        (make-string-output-stream))
+             (theprocess  (run-program *clix-zsh* `("-c" ,acommand)
+                                       :output outs
+                                       :error  errs))
+             (retcode     (process-exit-code theprocess)))
+        (when (> retcode 0)
+          (funcall err-fun retcode (strip (get-output-stream-string errs))))
+        (values (strip (get-output-stream-string outs))
+                (strip (get-output-stream-string errs))
+                retcode)))))
 
 
 (defun universal->unix-time (universal-time)
