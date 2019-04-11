@@ -52,10 +52,13 @@
            :*clix-output-stream*
            :*clix-log-level*
            :*clix-zsh*
-           :+yellow-bold+
+           :+red-bold+
            :+green-bold+
+           :+yellow-bold+
+           :+blue-bold+
+           :+magenta-bold+
            :+cyan-bold+
-           :+reset-terminal-col+
+           :+reset-terminal-color+
            ))
 (in-package :clix)
 
@@ -71,10 +74,13 @@
 (defparameter *clix-output-stream* *terminal-io*)
 (defparameter *clix-log-level* 1)
 
-(defvar +yellow-bold+         (format nil "~c[33;1m" #\ESC))
-(defvar +green-bold+          (format nil "~c[32;1m" #\ESC))
-(defvar +cyan-bold+           (format nil "~c[36;1m" #\ESC))
-(defvar +reset-terminal-col+  (format nil "~c[0m" #\ESC))
+(defvar +red-bold+              (format nil "~c[31;1m" #\ESC))
+(defvar +green-bold+            (format nil "~c[32;1m" #\ESC))
+(defvar +yellow-bold+           (format nil "~c[33;1m" #\ESC))
+(defvar +blue-bold+             (format nil "~c[34;1m" #\ESC))
+(defvar +magenta-bold+          (format nil "~c[35;1m" #\ESC))
+(defvar +cyan-bold+             (format nil "~c[36;1m" #\ESC))
+(defvar +reset-terminal-color+  (format nil "~c[0m"    #\ESC))
 
 (defparameter *clix-zsh* "/usr/local/bin/zsh")
 
