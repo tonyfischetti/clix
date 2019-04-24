@@ -52,6 +52,7 @@
            :*clix-output-stream*
            :*clix-log-level*
            :*clix-zsh*
+           :ignore-the-errors-wrapper
            :+red-bold+
            :+green-bold+
            :+yellow-bold+
@@ -505,6 +506,15 @@
 
 
 (set-dispatch-macro-character #\# #\! #'clix-log)
+
+
+
+(defun ignore-the-errors-wrapper (stream char arg)
+  (declare (ignore char))
+  (let ((sexp (read stream t)))
+    `(ignore-errors ,sexp)))
+
+(set-dispatch-macro-character #\# #\? #'ignore-the-errors-wrapper)
 
 
 
