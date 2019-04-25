@@ -21,6 +21,8 @@
 
 (in-package :linedit)
 
+(pushnew :linedit *features*)
+
 (defun linedit (&rest keyword-args)
   "Reads a single line of input with line-editing."
   (let ((editor (apply 'make-editor keyword-args)))
