@@ -43,6 +43,7 @@
            :set-hash
            :get-hash
            :print-hash-table
+           :it!
            :index!
            :line!
            :value!
@@ -390,8 +391,8 @@
 
 (defmacro aif (test then &optional else)
   "Like IF. IT is bound to TEST."
-  `(let ((it ,test))
-     (if it ,then ,else)))
+  `(let ((it! ,test))
+     (if it! ,then ,else)))
 
 (defun interpose (separator list)
   "Returns a sequence of the elements of SEQUENCE separated by SEPARATOR."
