@@ -200,7 +200,7 @@
      <>))
 
 
-(defun zsh (acommand &key (dry-run nil) (err-fun #'(lambda (code stderr) (error (format nil "~A (~A)" stderr code)))) (echo nil))
+(defun zsh (acommand &key (dry-run nil) (err-fun #'(lambda (code stderr) (error (format nil "~A (~A)" stderr code)))) (echo nil) (enc :UTF-8))
   (flet ((strip (astring)
     (if (string= "" astring)
       astring
@@ -212,7 +212,8 @@
              (errs        (make-string-output-stream))
              (theprocess  (run-program *clix-zsh* `("-c" ,acommand)
                                        :output outs
-                                       :error  errs))
+                                       :error  errs
+                                       :external-format enc))
              (retcode     (process-exit-code theprocess)))
         (when (> retcode 0)
           (funcall err-fun retcode (strip (get-output-stream-string errs))))
