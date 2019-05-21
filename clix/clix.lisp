@@ -34,6 +34,8 @@
            :universal->unix-time
            :unix->universal-time
            :get-unix-time
+           :get-current-time
+           :make-pretty-time
            :eval-always
            :abbr
            :str-join
@@ -90,6 +92,76 @@
   (encode-universal-time 0 0 0 1 1 1970 0))
 
 ;---------------------------------------------------------;
+
+
+;---------------------------------------------------------;
+; logging
+
+(defun clix-log-verbose (stream char arg)
+  ;;;;;; HOW UNHYGENIC IS THIS???!!
+  (declare (ignore char))
+  (multiple-value-bind (second minute hour date month year day-of-week dst-p tz) (get-decoded-time)
+    (let ((sexp               (read stream t))
+          (thetime            (get-universal-time))
+          (thereturnvalue     nil)
+          (thetimingresults   nil)
+          (daoutputstream     (make-string-output-stream)))
+      `(progn
+         (format *clix-output-stream*
+                 "--------------------~%[~A-~A-~A ~2,'0d:~2,'0d:~2,'0d]~%~%FORM:~%~A~%"
+                 ,year ,month ,date ,hour ,minute ,second
+                 ; (write-to-string ',sexp))
+                 (format nil "λ ~S~%" ',sexp))
+         (let ((daoutputstream (make-string-output-stream)))
+           (let ((*trace-output* daoutputstream))
+             (setq thereturnvalue (progn (time ,sexp))))
+               (setq thetimingresults (prettify-time-output (get-output-stream-string daoutputstream))))
+         (format *clix-output-stream* "RETURNED:~%~A~%" thereturnvalue)
+         (format *clix-output-stream* "~%~A~%--------------------~%~%~%" thetimingresults)
+         (finish-output *clix-output-stream*)
+         thereturnvalue))))
+
+
+(defun clix-log-just-echo (stream char arg)
+  ;;;;;; HOW UNHYGENIC IS THIS???!!
+  (declare (ignore char))
+  (multiple-value-bind (second minute hour date month year day-of-week dst-p tz) (get-decoded-time)
+    (let ((sexp               (read stream t))
+          (thetime            (get-universal-time))
+          (thereturnvalue     nil)
+          (thetimingresults   nil)
+          (daoutputstream     (make-string-output-stream)))
+      `(progn
+         (format *clix-output-stream* "~%λ ~S~%" ',sexp)
+         (let ((daoutputstream (make-string-output-stream)))
+           (let ((*trace-output* daoutputstream))
+             (setq thereturnvalue (progn (time ,sexp))))
+               (setq thetimingresults (prettify-time-output (get-output-stream-string daoutputstream))))
+         ; (format *clix-output-stream* "RETURNED:~%~A~%" thereturnvalue)
+         ; (format *clix-output-stream* "~%~A~%--------------------~%~%~%" thetimingresults)
+         (finish-output *clix-output-stream*)
+         thereturnvalue))))
+
+
+(defun clix-log (stream char arg)
+  (cond ((= *clix-log-level* 2)    (clix-log-verbose   stream char arg))
+        ((= *clix-log-level* 1)    (clix-log-just-echo stream char arg))
+        (                          nil)))
+
+
+(set-dispatch-macro-character #\# #\! #'clix-log)
+
+
+(defun ignore-the-errors-wrapper (stream char arg)
+  (declare (ignore char))
+  (let ((sexp (read stream t)))
+    `(ignore-errors ,sexp)))
+
+(set-dispatch-macro-character #\# #\? #'ignore-the-errors-wrapper)
+
+;---------------------------------------------------------;
+
+
 
 
 
@@ -220,7 +292,11 @@
         (values (strip (get-output-stream-string outs))
                 (strip (get-output-stream-string errs))
                 retcode)))))
+; --------------------------------------------------------------- ;
 
+
+; --------------------------------------------------------------- ;
+; time
 
 (defun universal->unix-time (universal-time)
   (- universal-time *unix-epoch-difference*))
@@ -231,6 +307,20 @@
 (defun get-unix-time ()
   (universal->unix-time (get-universal-time)))
 
+(defun get-current-time (&key (just-date nil) (just-time nil))
+  (make-pretty-time (-<> (get-universal-time) universal->unix-time)
+                    :just-date just-date :just-time just-time))
+
+
+(defun make-pretty-time (a-unix-time &key (just-date nil) (just-time nil))
+  (let ((thisuniversaltime (unix->universal-time a-unix-time)))
+    (multiple-value-bind (second minute hour date month year)
+      (decode-universal-time thisuniversaltime)
+      (if (and (not just-date) (not just-time))
+        (format nil "~d-~2,'0d-~2,'0d ~d:~2,'0d:~2,'0d" year month date hour minute second)
+        (if just-date
+          (format nil "~d-~2,'0d-~2,'0d" year month date)
+          (format nil "~d:~2,'0d:~2,'0d" hour minute second))))))
 
 ;---------------------------------------------------------;
 
@@ -451,74 +541,5 @@
 
 
 
-;;;;;; A HAVE TO REFACTOR THIS REALLY BAD
-;;;;;; I JUST WANNA TRY SOMETHING OUT RIGHT QUICK
 
-
-(defun clix-log-verbose (stream char arg)
-  ;;;;;; HOW UNHYGENIC IS THIS???!!
-  (declare (ignore char))
-  (multiple-value-bind (second minute hour date month year day-of-week dst-p tz) (get-decoded-time)
-    (let ((sexp               (read stream t))
-          (thetime            (get-universal-time))
-          (thereturnvalue     nil)
-          (thetimingresults   nil)
-          (daoutputstream     (make-string-output-stream)))
-      `(progn
-         (format *clix-output-stream*
-                 "--------------------~%[~A-~A-~A ~2,'0d:~2,'0d:~2,'0d]~%~%FORM:~%~A~%"
-                 ,year ,month ,date ,hour ,minute ,second
-                 ; (write-to-string ',sexp))
-                 (format nil "λ ~S~%" ',sexp))
-         (let ((daoutputstream (make-string-output-stream)))
-           (let ((*trace-output* daoutputstream))
-             (setq thereturnvalue (progn (time ,sexp))))
-               (setq thetimingresults (prettify-time-output (get-output-stream-string daoutputstream))))
-         (format *clix-output-stream* "RETURNED:~%~A~%" thereturnvalue)
-         (format *clix-output-stream* "~%~A~%--------------------~%~%~%" thetimingresults)
-         (finish-output *clix-output-stream*)
-         thereturnvalue))))
-
-
-(defun clix-log-just-echo (stream char arg)
-  ;;;;;; HOW UNHYGENIC IS THIS???!!
-  (declare (ignore char))
-  (multiple-value-bind (second minute hour date month year day-of-week dst-p tz) (get-decoded-time)
-    (let ((sexp               (read stream t))
-          (thetime            (get-universal-time))
-          (thereturnvalue     nil)
-          (thetimingresults   nil)
-          (daoutputstream     (make-string-output-stream)))
-      `(progn
-         (format *clix-output-stream* "~%λ ~S~%" ',sexp)
-         (let ((daoutputstream (make-string-output-stream)))
-           (let ((*trace-output* daoutputstream))
-             (setq thereturnvalue (progn (time ,sexp))))
-               (setq thetimingresults (prettify-time-output (get-output-stream-string daoutputstream))))
-         ; (format *clix-output-stream* "RETURNED:~%~A~%" thereturnvalue)
-         ; (format *clix-output-stream* "~%~A~%--------------------~%~%~%" thetimingresults)
-         (finish-output *clix-output-stream*)
-         thereturnvalue))))
-
-
-(defun clix-log (stream char arg)
-  (cond ((= *clix-log-level* 2)    (clix-log-verbose   stream char arg))
-        ((= *clix-log-level* 1)    (clix-log-just-echo stream char arg))
-        (                          nil)))
-
-
-(set-dispatch-macro-character #\# #\! #'clix-log)
-
-
-
-(defun ignore-the-errors-wrapper (stream char arg)
-  (declare (ignore char))
-  (let ((sexp (read stream t)))
-    `(ignore-errors ,sexp)))
-
-(set-dispatch-macro-character #\# #\? #'ignore-the-errors-wrapper)
-
-
-
-; (set-macro-character #\💯 #'clix-log3)
 
