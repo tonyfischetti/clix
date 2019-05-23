@@ -27,7 +27,7 @@
            :for-each-line
            :for-each-in-stream
            :cmdargs
-           :clear
+           :clear-screen
            :-<>
            :<>
            :zsh
@@ -252,7 +252,7 @@
    nil))
 
 
-(defun clear ()
+(defun clear-screen ()
   "A multi-implementation function to clear the terminal screen"
    #+clisp    (shell "clear")
    #+ecl      (si:system "clear")
