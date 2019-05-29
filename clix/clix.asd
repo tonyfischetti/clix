@@ -2,5 +2,6 @@
 (asdf:defsystem :clix
   :description "My personal common lisp utilities"
   :author "Tony Fischetti"
-  :license "MIT (Expat)"
+  :license "GPL-3"
+  :depends-on (:cl-fad :cl-ppcre)
   :components ((:file "clix")))

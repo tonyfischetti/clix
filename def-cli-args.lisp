@@ -36,11 +36,11 @@
            (unless (null args!)
              (let ((current (car args!)))
                (cond
-                 ((re:scan "^-\\w\\w+$" current)
+                 ((cl-ppcre:scan "^-\\w\\w+$" current)
                             (process-args! (append
                                              (mapcar
                                                (lambda (x) (format nil "-~A" x))
-                                               (cdr (re:split "" current)))
+                                               (cdr (cl-ppcre:split "" current)))
                                              (cdr args))))
                  ,@tmp
                  (t (progn (push current bare-args!) (process-args! (cdr args!))))
