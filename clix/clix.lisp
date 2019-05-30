@@ -21,11 +21,6 @@
            :progress
            :get-size
            :for-each
-           :for-each-list
-           :for-each-vector
-           :for-each-hash
-           :for-each-line
-           :for-each-stream
            :index!
            :value!
            :key!
@@ -56,6 +51,7 @@
            :get-alist
            :rem-alist
            :print-hash-table
+           :with-gensyms
            :it!
            :clix-log
            :*clix-output-stream*
@@ -76,6 +72,19 @@
            :str-detect
            :str-subset
            :str-scan-to-strings
+           :~m
+           :~r
+           :~ra
+           :~s
+           :~f
+           :with-r
+           :r-get
+           :alist->hash-table
+           :hash-table->alist
+           :with-a-file
+           :stream!
+           :rnorm
+           :delim
            ))
 (in-package :clix)
 
@@ -108,9 +117,14 @@
 
 ;---------------------------------------------------------;
 
-
 ;---------------------------------------------------------;
-; logging
+; Experimental logging and reader macros
+
+(defun prettify-time-output (thetimeoutput)
+  ; (format t "~A~%" (length thetimeoutput))
+  ;(remove-if (lambda (x) (char= #\Return x)) thetimeoutput)
+  (subseq thetimeoutput 0 (- (length thetimeoutput) 4)))
+  ; (remove-if (lambda (x) (or (char= #\Linefeed x) (char= #\Return x))) thetimeoutput))
 
 (defun clix-log-verbose (stream char arg)
   ;;;;;; HOW UNHYGENIC IS THIS???!!
@@ -140,22 +154,18 @@
 (defun clix-log-just-echo (stream char arg)
   ;;;;;; HOW UNHYGENIC IS THIS???!!
   (declare (ignore char))
-  (multiple-value-bind (second minute hour date month year day-of-week dst-p tz) (get-decoded-time)
-    (let ((sexp               (read stream t))
-          (thetime            (get-universal-time))
-          (thereturnvalue     nil)
-          (thetimingresults   nil)
-          (daoutputstream     (make-string-output-stream)))
+  (let ((sexp               (read stream t))
+    ;       (thetime            (get-universal-time))
+    ;       (thereturnvalue     nil)
+    ;       (thetimingresults   nil))
       `(progn
+         (format t "~S~%" ',sexp)
          (format *clix-output-stream* "~%λ ~S~%" ',sexp)
-         (let ((daoutputstream (make-string-output-stream)))
-           (let ((*trace-output* daoutputstream))
-             (setq thereturnvalue (progn (time ,sexp))))
-               (setq thetimingresults (prettify-time-output (get-output-stream-string daoutputstream))))
-         ; (format *clix-output-stream* "RETURNED:~%~A~%" thereturnvalue)
-         ; (format *clix-output-stream* "~%~A~%--------------------~%~%~%" thetimingresults)
-         (finish-output *clix-output-stream*)
-         thereturnvalue))))
+         (let* ((daoutputstream   (make-string-output-stream))
+                (*trace-output*   daoutputstream)
+                (thereturnvalue   (progn (time ,sexp))))
+           (finish-output *clix-output-stream*)
+           ,thereturnvalue)))))
 
 
 (defun clix-log (stream char arg)
@@ -307,12 +317,12 @@
 (defun zsh (acommand &key (dry-run nil)
                           (err-fun #'(lambda (code stderr) (error (format nil "~A (~A)" stderr code))))
                           (echo nil)
-                          (enc :UTF-8))
+                          (enc *clix-external-format*))
   "Runs command `acommand` through the ZSH shell specified by the global *clix-zsh*
    `dry-run` just prints the command (default nil)
    `err-fun` takes a function that takes an error code and the STDERR output
    `echo` will print the command before running it
-   `enc` takes a format (default is :UTF-8)"
+   `enc` takes a format (default is *clix-external-format* [which is :UTF-8 by default])"
   (flet ((strip (astring)
     (if (string= "" astring)
       astring
@@ -410,7 +420,8 @@
      `this-pass!`         (a block that returning from immediately moves to the next iteration)
      `this-loop!`         (a block that returning from exits the loop)
   For convenience, `(continue!)` and `(break!)` will execute `(return-from this-pass!)`
-  and `(return-from this-loop!)`, respectively"
+  and `(return-from this-loop!)`, respectively
+  If it's a filename, the external format is *clix-external-format* (:UTF-8 by default)"
   (let ((tmp (gensym)))
     `(let ((index!    -1)
            (key!      nil)
@@ -420,7 +431,7 @@
       (declare (ignorable key!))
       (declare (ignorable value!))
       (cond
-        ((and (listp ,tmp) (= (length (car ,tmp)) 2) (atom (cdr (car ,tmp))))
+        ((and (listp ,tmp) (listp (car ,tmp)) (not (alexandria:proper-list-p (car ,tmp))))
                     (for-each-alist (index! key! value! ,tmp)               ,@body))
         ((and (stringp ,tmp) (cl-fad:file-exists-p ,tmp))
                     (for-each-line      (index! value! ,tmp)                ,@body))
@@ -616,21 +627,21 @@
 
 ;---------------------------------------------------------;
 
+; Stolen from Practical common lisp
+(defmacro with-gensyms ((&rest names) &body body)
+  "Why mess with the classics"
+  `(let ,(loop for n in names collect `(,n (gensym)))
+     ,@body))
 
 
 
-;---------------------------------------------------------;
-; Experimental logging and reader macros
 
-(defun prettify-time-output (thetimeoutput)
-  ; (format t "~A~%" (length thetimeoutput))
-  ;(remove-if (lambda (x) (char= #\Return x)) thetimeoutput)
-  (subseq thetimeoutput 0 (- (length thetimeoutput) 4)))
-  ; (remove-if (lambda (x) (or (char= #\Linefeed x) (char= #\Return x))) thetimeoutput))
 
 
 ; --------------------------------------------------------------- ;
 ; --------------------------------------------------------------- ;
+
+; cl-ppcre wrappers where the arguments are re-arranged to make sense to me
 
 (defun str-split (astr sep &key (limit))
   "Wrapper around cl-ppcre:split with string first"
@@ -664,5 +675,141 @@
     (cl-ppcre:scan-to-strings pattern astr)
     (declare (ignore dontneed))
     need))
+
+(defun ~m (astring aregex)
+  "Alias to str-detect"
+  (str-detect astring aregex))
+
+(defun ~r (astring from to)
+  "Alias to str-replace (one"
+  (str-replace astring from to))
+
+(defun ~ra (astring from to)
+  "Alias to str-replace-all"
+  (str-replace-all astring from to))
+
+(defun ~s (astring aregex &key (limit))
+  "Alias to str-split"
+  (str-split astring aregex :limit limit))
+
+(defun ~f (alist aregex)
+  "Alias to str-subset"
+  (str-subset alist aregex))
+
+
+; --------------------------------------------------------------- ;
+; --------------------------------------------------------------- ;
+
+; very hacky interface to R for emergencies
+; because LITERALLY NOTHING ELSE WORKS!
+
+(defun r-get (acommand &key (type *read-default-float-format*) (what :raw))
+  "Runs a command through R and returns the result.
+    `:type` specifies what parse-float:parse-float should use to parse the result
+    `:what` specifies the intended format (:single (atom) :vector, or :raw (default)"
+  (let* ((newcom (str-replace-all acommand "'" (format nil "~C" #\QUOTATION_MARK)))
+         (result (zsh (format nil "R --silent -e '~A'" newcom))))
+    (if (eq what :raw)
+      result
+      (-<>
+        ((lambda (x) x) result)
+        (str-split <> "\\n")
+        (remove-if-not (lambda (x) (str-detect x "^\\s*\\[\\d+\\]")) <>)
+        (str-join "" <>)
+        (str-replace-all <> "\\[\\d+\\]" "")
+        (str-split <> "\\s+")
+        (remove-if (lambda (x) (string= "" x)) <>)
+        ((lambda (x)
+           (cond
+             ((eq what :vector) (mapcar (lambda (y) (parse-float:parse-float y :type type)) x))
+             ((eq what :single)
+                  (progn
+                    (let ((res (mapcar (lambda (y) (parse-float:parse-float y :type type)) x)))
+                      (if (> (length res) 1)
+                        (error "not vector of length 1")
+                        (car res)))))
+             (t x))) <>)))))
+
+(defmacro with-r (what &body body)
+  "Macro that will take all the strings given in the body and
+   run them at once in R. The first argument specifies the
+   intended return type (:single :vector :raw)"
+  (let ((thecom (gensym)))
+    `(let ((,thecom (str-join ";" ',body)))
+       (r-get ,thecom :what ,what))))
+
+
+; --------------------------------------------------------------- ;
+; --------------------------------------------------------------- ;
+
+; alexandria re-exports
+
+(defun alist->hash-table (analist)
+  (alexandria:alist-hash-table analist))
+
+(defun hash-table->alist (analist)
+  (alexandria:hash-table-alist analist))
+
+; --------------------------------------------------------------- ;
+; --------------------------------------------------------------- ;
+
+; more
+
+(defmacro with-a-file (filename key &body body)
+  "Anaphoric macro that binds `stream!` to the stream
+   First argument is the filename
+   The second argument is one of
+     `:w` - write to a file  (clobber if already exists)
+     `:a` - append to a file (create if doesn't exist)
+     `:r` - read a file      (in text mode)
+     `:b` - read a file      (in binary mode [unsigned-byte 8])
+    Only provide one of these arguments"
+   (let ((dir (cond
+                ((eq key :w) :output)       ((eq key :a) :output)
+                ((eq key :r) :input)        ((eq key :b) :input)))
+         (iex (cond
+                ((eq key :w) :supersede)    ((eq key :a) :append)
+                ((eq key :r) :append)       ((eq key :b) :append))))
+    `(with-open-file (stream! ,filename :direction ,dir :if-exists ,iex
+                              ,@(when (eq key :b)
+                                  `(':element-type 'unsigned-byte))
+                              :if-does-not-exist :create
+                              :external-format *clix-external-format*)
+       ,@body)))
+
+
+(defun rnorm (n &key (mean 0) (sd 1))
+  "Makes a list of `n` random variates with mean of `mean` and
+   standard deviation of `sd`"
+  (loop for i from 1 to n collect (+ mean (* sd (alexandria:gaussian-random)))))
+
+
+(defun delim (anlist &key (what :list) (sep #\Tab))
+  "Makes a string with tabs separating values.
+   `:what` either :list :listoflist :hash or :alist
+   `:sep` the (CHARACTER) separator to use (default is tab)"
+  (labels ((join-with-sep      (x) (str-join (format nil "~C" sep) x))
+           (join-with-newlines (x) (str-join (format nil "~C" #\Newline) x)))
+    (cond
+      ((eq :list what)   (str-join (format nil "~C" sep) anlist))
+      ((eq :alist what)  (join-with-newlines (loop for i in anlist
+                                                   for key = (car i)
+                                                   for val = (cdr i)
+                                                   collect (join-with-sep (list key val)))))
+      ((eq :listoflists what)
+                         (join-with-newlines (loop for i in anlist
+                                                   collect (join-with-sep i))))
+      ((eq :hash what)   (join-with-newlines (loop for key being the hash-keys in anlist
+                                                   using (hash-value val)
+                                                   collect (join-with-sep (list key val)))))
+      (t                 (error "unsupported type")))))
+
+
+
+
+
+
+
+
 
 
