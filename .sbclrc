@@ -1,32 +1,32 @@
 
-;;; The following lines added by ql:add-to-init-file:
-#-quicklisp
-(let ((quicklisp-init (merge-pathnames "quicklisp/setup.lisp"
-                                       (user-homedir-pathname))))
-  (when (probe-file quicklisp-init)
-    (load quicklisp-init)))
 
+#-quicklisp (load "~/quicklisp/setup.lisp")
 
 (setf sb-int:*repl-prompt-fun* (lambda (stream) (format stream "~%λ ")))
-
-
 (if (member "--no-linedit" sb-ext:*posix-argv* :test 'equal)
   (setf sb-ext:*posix-argv*
         (remove "--no-linedit" sb-ext:*posix-argv* :test 'equal))
   (when (interactive-stream-p *terminal-io*)
     (require :sb-aclrepl)
-    (ql:quickload "linedit")
+    ; (ql:quickload "linedit") ; :silent t)
+    (ql:quickload "linedit" :silent t)
     (funcall (intern "INSTALL-REPL" :linedit) :wrap-current t
                                               :eof-quits t)))
 
-(when (member "--with-clix" sb-ext:*posix-argv* :test 'equal)
-  (ql:register-local-projects)
-  (ql:quickload :clix)
+; (when (member "--with-clix" sb-ext:*posix-argv* :test 'equal)
+;   (ql:register-local-projects)
+;   (ql:quickload :clix)
+;   (use-package :clix))
+
+(unless (member "--without-clix" sb-ext:*posix-argv* :test 'equal)
+  (ql:quickload :clix :silent t)
   (use-package :clix))
 
-(when (member "--no-warnings" sb-ext:*posix-argv* :test 'equal)
+(unless (member "--warnings" sb-ext:*posix-argv* :test 'equal)
   (declaim (sb-ext:muffle-conditions cl:warning))
   (declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
   (setf sb-debug:*debug-beginner-help-p* nil))
 
 ; (sb-int:set-floating-point-modes :traps nil)
+
+

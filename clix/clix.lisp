@@ -421,9 +421,11 @@
      `this-loop!`         (a block that returning from exits the loop)
   For convenience, `(continue!)` and `(break!)` will execute `(return-from this-pass!)`
   and `(return-from this-loop!)`, respectively
-  If it's a filename, the external format is *clix-external-format* (:UTF-8 by default)"
+  If it's a filename, the external format is *clix-external-format* (:UTF-8 by default)
+  Oh, it'll die if Control-C is used during the loops execution."
   (let ((tmp (gensym)))
-    `(let ((index!    -1)
+    `(handler-case
+       (let ((index!    -1)
            (key!      nil)
            (value!    nil)
            (,tmp      ,a-thing))
@@ -442,7 +444,9 @@
               (hash-table     (for-each-hash      (index! key! value! ,tmp) ,@body))
               (vector         (for-each-vector    (index! value! ,tmp)      ,@body))
               (list           (for-each-list      (index! value! ,tmp)      ,@body))
-              (stream         (for-each-stream    (index! value! ,tmp)      ,@body)))))))))
+              (stream         (for-each-stream    (index! value! ,tmp)      ,@body)))))))
+       (sb-sys:interactive-interrupt ()
+         (die (format nil "~%~ALoop aborted. Bailing out.~A~%" +red-bold+ +reset-terminal-color+))))))
 
 (defmacro for-each-list ((index value a-list) &body body)
   `(let ((,index -1))
