@@ -25,7 +25,8 @@
 (unless (member "--warnings" sb-ext:*posix-argv* :test 'equal)
   (declaim (sb-ext:muffle-conditions cl:warning))
   (declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
-  (setf sb-debug:*debug-beginner-help-p* nil))
+  (setf sb-debug:*debug-beginner-help-p* nil)
+  (setf sb-debug:*backtrace-frame-count* 2))
 
 ; (sb-int:set-floating-point-modes :traps nil)
 
