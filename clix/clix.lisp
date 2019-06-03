@@ -86,6 +86,9 @@
            :stream!
            :rnorm
            :delim
+           :defparams
+           :if->then
+           :if-this->then
            ))
 (in-package :clix)
 
@@ -771,6 +774,23 @@
 ; --------------------------------------------------------------- ;
 ; --------------------------------------------------------------- ;
 
+; interesting reader macros
+
+(defun |•-reader| (stream char)
+  "Alternate double quote"
+  (declare (ignore char))
+  (let (chars)
+    (do ((prev (read-char stream) curr)
+         (curr (read-char stream) (read-char stream)))
+        ((char= curr #\Bullet) (push prev chars))
+      (push prev chars))
+    (coerce (nreverse chars) 'string)))
+
+(set-macro-character #\Bullet #'|•-reader|)
+
+; --------------------------------------------------------------- ;
+; --------------------------------------------------------------- ;
+
 ; more
 
 (defmacro with-a-file (filename key &body body)
@@ -823,24 +843,50 @@
       (t                 (error "unsupported type")))))
 
 
+(defmacro defparams (&body body)
+  "Declares the arguments to by special defparameter parameters
+   with a value on `nil`"
+  (labels ((helper (alist)
+              (loop for i in alist collect `(defparameter ,i nil))))
+    (let ((tmp (helper body)))
+     `(progn  ,@tmp))))
 
 
-; --------------------------------------------------------------- ;
-; --------------------------------------------------------------- ;
+(defmacro if->then (&body body)
+  "Example:
+    (if->then
+      (string= *character* •cosmo•)    ->    •kramer•
+      (string= *character* •jerry•)    ->    •seinfeld•
+      (string= *character* •elaine•)   ->    •benes•
+      (string= *character* •george•)   ->    •costanza•)"
+  (labels ((group-them (alist)
+    (unless (null alist)
+      (cons `(,(car alist) ,(caddr alist))
+            (group-them (cdddr alist))))))
+  (let ((in-3s (group-them body)))
+    `(cond ,@(group-them body)))))
 
-; interesting reader macros
 
-(defun |•-reader| (stream char)
-  "Alternate double quote"
-  (declare (ignore char))
-  (let (chars)
-    (do ((prev (read-char stream) curr)
-         (curr (read-char stream) (read-char stream)))
-        ((char= curr #\Bullet) (push prev chars))
-      (push prev chars))
-    (coerce (nreverse chars) 'string)))
-
-(set-macro-character #\Bullet #'|•-reader|)
+(defmacro if-this->then (athing atest adefault &body body)
+  "Similar to `if-then` but takes a thing to test, a predicate function,
+   and what to return if all else fails
+  Example:
+    (if-this->then *character* #'string= nil
+      •cosmo•   ->  •kramer•
+      •george•  ->  •constanza•
+      •elaine•  ->  •benes•
+      •jerry•   -> •seinfeld•)"
+  (with-gensyms (thething thetest thedefault)
+    (labels ((group-them (alist)
+      (unless (null alist)
+        (cons `((funcall ,thetest ,(car alist) ,thething) ,(caddr alist))
+              (group-them (cdddr alist))))))
+    (let ((in-3s (group-them body)))
+      `(let ((,thething ,athing)
+             (,thetest  ,atest)
+             (,thedefault ,adefault))
+         (cond ,@(group-them body)
+               (t            ,thedefault)))))))
 
 
 

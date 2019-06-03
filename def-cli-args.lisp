@@ -20,7 +20,6 @@
      (macrolet ((assign-next-arg! (avar)
        `(progn (setq ,avar (cadr args!)) (process-args! (cddr args!)))))
        (or-die ("invalid arguments")
-       ; (or-die ((format nil "invalid ~A~%" err!))
          (defparameter args!        nil)
          (defparameter bare-args!   nil)
          (defparameter +USAGE-TEXT!+
@@ -32,7 +31,6 @@
            (die "" :status 0))
          (defun process-args! (args)
            (setq args! args)
-           ; (format t "current args: ~S~%" args!)
            (unless (null args!)
              (let ((current (car args!)))
                (cond
@@ -43,7 +41,7 @@
                                                (cdr (cl-ppcre:split "" current)))
                                              (cdr args))))
                  ,@tmp
-                 (t (progn (push current bare-args!) (process-args! (cdr args!))))
+                 (t (progn (setq bare-args! (reverse (cons current bare-args!))) (process-args! (cdr args!))))
                  )
                ))))))))
 
