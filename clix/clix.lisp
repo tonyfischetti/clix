@@ -21,6 +21,7 @@
            :progress
            :get-size
            :for-each
+           :for-each-node-set
            :index!
            :value!
            :key!
@@ -28,6 +29,9 @@
            :this-loop!
            :continue!
            :break!
+           :for-each->list
+           :for-each->vector
+           :collect!
            :cmdargs
            :clear-screen
            :-<>
@@ -38,6 +42,13 @@
            :get-unix-time
            :get-current-time
            :make-pretty-time
+           :request
+           :xml-parse
+           :xml-parse-file
+           :xpath
+           :xpath-1
+           :xml-name
+           :xml-text
            :eval-always
            :abbr
            :str-join
@@ -119,6 +130,16 @@
   (encode-universal-time 0 0 0 1 1 1970 0))
 
 ;---------------------------------------------------------;
+
+;---------------------------------------------------------;
+
+; Stolen from Practical common lisp
+(defmacro with-gensyms ((&rest names) &body body)
+  "Why mess with the classics"
+  `(let ,(loop for n in names collect `(,n (gensym)))
+     ,@body))
+
+; --------------------------------------------------------------- ;
 
 ;---------------------------------------------------------;
 ; Experimental logging and reader macros
@@ -252,10 +273,12 @@
    (format *error-output* "~A~%" message))
 
 
-(declaim (inline set-hash))
-(defun set-hash (ht key val)
-  "Set VAL at KEY in hash-table HT."
-  (setf (gethash key ht) val))
+(defmacro set-hash (aht akey aval)
+  (with-gensyms (theht thekey theval)
+    `(let ((,theht  ,aht)
+           (,thekey ,akey)
+           (,theval ,aval))
+       (setf (gethash ,thekey ,theht) ,theval))))
 
 
 (declaim (inline get-hash))
@@ -269,17 +292,17 @@
   "Remove KEY in hash-table HT"
   (remhash key ht))
 
-(defmacro set-alist (aalist key value)
+(defmacro set-alist (aalist key value &key (test #'eq))
   "Adds `key` and `value` to an alist `aalist`
   (must be a macro in order to modify the alist in place)"
-  `(if (null (assoc ,key ,aalist))
+  `(if (null (assoc ,key ,aalist :test ,test))
     (push (cons ,key ,value) ,aalist)
-    (setf (cdr (assoc ,key ,aalist)) ,value)))
+    (setf (cdr (assoc ,key ,aalist :test ,test)) ,value)))
 
 (declaim (inline get-alist))
-(defun get-alist (aalist key)
+(defun get-alist (aalist key &key (test #'eq))
   "Returns value of `key` of `aalist`"
-  (cdr (assoc key aalist)))
+  (cdr (assoc key aalist :test test)))
 
 (defmacro rem-alist (aalist key)
   "Destructively deletes `key`/value pair from `aalist`
@@ -382,11 +405,35 @@
   (make-pretty-time (-<> (get-universal-time) universal->unix-time)
                     :just-date just-date :just-time just-time))
 
-
 ;---------------------------------------------------------;
 
 
+; --------------------------------------------------------------- ;
+; XML stuff
 
+(defun request (aurl)
+  (drakma:http-request aurl))
+
+(defun xml-parse (astring)
+  (cxml:parse astring (cxml-dom:make-dom-builder)))
+
+(defun xml-parse-file (afile)
+  (cxml:parse-file afile (cxml-dom:make-dom-builder)))
+
+(defun xpath (adom anxpath)
+  (xpath:evaluate anxpath adom))
+
+(defun xpath-1 (adom anxpath)
+  (xpath:first-node (xpath adom anxpath)))
+
+(defun xml-name (andom)
+  (dom:tag-name andom))
+
+(defun xml-text (andom)
+  (xpath:string-value andom))
+
+
+; --------------------------------------------------------------- ;
 
 
 ;---------------------------------------------------------;
@@ -447,6 +494,7 @@
               (hash-table     (for-each-hash      (index! key! value! ,tmp) ,@body))
               (vector         (for-each-vector    (index! value! ,tmp)      ,@body))
               (list           (for-each-list      (index! value! ,tmp)      ,@body))
+              (xpath:node-set (for-each-node-set  (index! value! ,tmp)      ,@body))
               (stream         (for-each-stream    (index! value! ,tmp)      ,@body)))))))
        (sb-sys:interactive-interrupt ()
          (die (format nil "~%~ALoop aborted. Bailing out.~A~%" +red-bold+ +reset-terminal-color+))))))
@@ -503,6 +551,30 @@
          (loop for ,value = (read-line ,instream nil)
                while ,value do (progn (incf ,index) (block this-pass! ,@body)))
          (close ,instream)))))
+
+(defmacro for-each-node-set ((index value aset) &body body)
+  `(let ((,index -1))
+     (block this-loop!
+            (xpath:do-node-set (,value ,aset)
+              (incf ,index)
+              (block this-pass! ,@body)))))
+
+
+(defmacro for-each->list (athing &body body)
+  (with-gensyms (result)
+    `(let ((,result '()))
+       (flet ((collect! (item) (push item ,result) item))
+         (for-each ,athing ,@body))
+       (nreverse ,result))))
+
+(defmacro for-each->vector (athing options &body body)
+  (destructuring-bind (&key (size 16) (element-type t)) options
+    (with-gensyms (result)
+      `(let ((,result (make-array ,size :adjustable t :fill-pointer 0
+                                  :element-type ,element-type)))
+         (flet ((collect! (item) (vector-push-extend item ,result) item))
+           (for-each ,athing ,@body))
+         ,result))))
 
 ;---------------------------------------------------------;
 
@@ -632,20 +704,6 @@
                           (princ "} " stream)))
   ht)
 
-;---------------------------------------------------------;
-
-; Stolen from Practical common lisp
-(defmacro with-gensyms ((&rest names) &body body)
-  "Why mess with the classics"
-  `(let ,(loop for n in names collect `(,n (gensym)))
-     ,@body))
-
-
-
-
-
-
-; --------------------------------------------------------------- ;
 ; --------------------------------------------------------------- ;
 
 ; cl-ppcre wrappers where the arguments are re-arranged to make sense to me
@@ -765,8 +823,9 @@
 
 ; alexandria re-exports
 
-(defun alist->hash-table (analist)
-  (alexandria:alist-hash-table analist))
+(defun alist->hash-table (analist &rest htargs)
+  (apply #'alexandria:alist-hash-table (cons analist htargs)))
+  ; (alexandria:alist-hash-table analist htargs))
 
 (defun hash-table->alist (analist)
   (alexandria:hash-table-alist analist))
