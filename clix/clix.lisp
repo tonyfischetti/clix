@@ -93,6 +93,7 @@
            :r-get
            :alist->hash-table
            :hash-table->alist
+           :debug-these
            :with-a-file
            :stream!
            :rnorm
@@ -207,6 +208,9 @@
 
 (set-dispatch-macro-character #\# #\? #'ignore-the-errors-wrapper)
 
+
+
+
 ;---------------------------------------------------------;
 
 
@@ -262,10 +266,10 @@
 
 
 (defmacro die-if-null (avar &rest therest)
-  "Calls CLIX:DIE if any of the arguments are NIL"
-  `(when (not (and ,avar ,@therest))
-     (die "Error: at least one of the arguments is NIL")))
-
+  "Macro to check if any of the supplied arguments are null"
+  (let ((whole (cons avar therest)))
+    `(loop for i in ',whole
+           do (unless (eval i) (die (format nil "Fatal error: ~A is null" i))))))
 
 (defun advise (message)
   "Prints MESSAGE to *ERROR-OUTPUT* but resumes
@@ -847,10 +851,47 @@
 
 (set-macro-character #\Bullet #'|•-reader|)
 
+
+(defun |ensure-not-null| (stream char)
+  "Reader macro to check if symbol is null,
+   otherwise, pass it on"
+  (declare (ignore char))
+  (let ((sexp (read stream t)))
+    `(progn
+       (aif (eval ',sexp)
+            it!
+            (error "its null")))))
+
+(set-macro-character #\Ø #'|ensure-not-null|)
+
+
+(defun |if-null->this| (stream char)
+  "Reader macro that takes to s-expressions.
+   If the first evaluates to not null, it is returned.
+   If the first evaluates to null, the second s-expression is returned"
+  (declare (ignore char))
+  (let ((sexp (read stream t))
+        (replacement (read stream t))
+        (res  (gensym)))
+    `(let ((,res ,sexp))
+       (if ,res ,res ,replacement))))
+
+(set-macro-character #\? #'|if-null->this|)
+
 ; --------------------------------------------------------------- ;
 ; --------------------------------------------------------------- ;
 
 ; more
+
+(defmacro debug-these (avar &rest therest)
+  """
+  Macro that takes an arbitrary number of arguments,
+  prints the symbol, and then prints it's evaluated value
+  (for debugging)
+  """
+  (let ((whole (cons avar therest)))
+    `(loop for i in ',whole do (format t "~15S -> ~S~%" i (eval i)))))
+
 
 (defmacro with-a-file (filename key &body body)
   "Anaphoric macro that binds `stream!` to the stream
