@@ -16,7 +16,7 @@
            :die
            :advise
            :or-die
-           :err!
+           :error!
            :die-if-null
            :progress
            :get-size
@@ -261,7 +261,7 @@
   `(handler-case
      (progn
        ,@body)
-     (error (err!)
+     (error (error!)
        (funcall ,errfun (format nil "~A" ,message)))))
 
 
@@ -877,6 +877,41 @@
        (if ,res ,res ,replacement))))
 
 (set-macro-character #\? #'|if-null->this|)
+
+
+(defun |«-reader| (stream char)
+  "Examples:
+     « (/ 3 1) or die error! »        ; returns 3
+     « (/ 3 0) or warn error! »       ; stderrs error, continues, and returns NIL
+     « (/ 3 0) or die error! »        ; dies with error message
+     « 3 or die error! »              ; returns 3
+     « nil or die error! »            ; dies because atom preceding `or` is NIL"
+  (let ((err-mess     "« reader macro not written to specification")
+        (ender        "»")
+        (before       (read stream))
+        (theor        (read stream))
+        (theoperator  (read stream))
+        (after        (read stream))
+        (theend-p     (symbol-name (read stream)))
+        (res          (gensym)))
+    ; syntax error checking
+    (unless (string= theend-p ender) (die err-mess))
+    (unless (string= (symbol-name theor) "OR") (die err-mess))
+    (cond
+      ((consp before)
+       (cond
+         ((string= "DIE" (symbol-name theoperator))
+           `(or-die (,after) ,before))
+         ((string= "WARN" (symbol-name theoperator))
+           `(or-die (,after :errfun #'advise) ,before))))
+      ((atom before)
+       (cond
+         ((string= "DIE" (symbol-name theoperator))
+           `(if ,before ,before (die ,after)))
+         ((string= "WARN" (symbol-name theoperator))
+           `(if ,before ,before (advise ,after))))))))
+
+(set-macro-character #\« #'|«-reader|)
 
 ; --------------------------------------------------------------- ;
 ; --------------------------------------------------------------- ;

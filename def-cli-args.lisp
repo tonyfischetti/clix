@@ -13,7 +13,7 @@
                         `((or
                             (string= current ,(second x)) (string= current ,(third x)))
                           (progn
-                            (or-die ((format nil "Fatal error processing ~A flag (~A)~%~%~A" ,(second x) err! +USAGE-TEXT!+))
+                            (or-die ((format nil "Fatal error processing ~A flag (~A)~%~%~A" ,(second x) error! +USAGE-TEXT!+))
                               ,@(nthcdr 4 x)))))
                       body)))
   `(progn
