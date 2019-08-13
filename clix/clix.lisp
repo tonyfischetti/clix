@@ -246,11 +246,14 @@
 ; reader macro for this?
 
 
-(defun die (message &key (status 1))
+(defun die (message &key (status 1) (red-p t))
   "Prints MESSAGE to *ERROR-OUTPUT* and quits with a STATUS (default 1)"
-  (format *error-output* "~A~%" message)
+  (format *error-output* "~A~A~A~%" (if red-p +red-bold+ "")
+                                    message
+                                    (if red-p +reset-terminal-color+ ""))
   #+clisp (ext:exit status)
   #+sbcl  (sb-ext:quit :unix-status status))
+
 
 (defmacro or-die ((message &key (errfun #'die)) &body body)
   "anaphoric macro that binds ERR! to the error
@@ -271,10 +274,13 @@
     `(loop for i in ',whole
            do (unless (eval i) (die (format nil "Fatal error: ~A is null" i))))))
 
-(defun advise (message)
+(defun advise (message &key (yellow-p t))
   "Prints MESSAGE to *ERROR-OUTPUT* but resumes
    (for use with OR-DIE's ERRFUN)"
-   (format *error-output* "~A~%" message))
+   (format *error-output* "~A~A~A~%" (if yellow-p +yellow-bold+ "")
+                                     message
+                                     (if yellow-p +reset-terminal-color+ "")))
+
 
 
 (defmacro set-hash (aht akey aval)
@@ -390,24 +396,25 @@
   "Get current UNIX time"
   (universal->unix-time (get-universal-time)))
 
-(defun make-pretty-time (a-unix-time &key (just-date nil) (just-time nil))
+(defun make-pretty-time (a-unix-time &key (just-date nil) (just-time nil) (time-sep ":"))
   "Makes a nicely formatted (YYYY-MM-DD HH?:MM:SS) from a UNIX time
    `just-date` will return just the pretty date
-   `just-time` will return just the pretty time"
+   `just-time` will return just the pretty time
+   `time-sep`  will use the supplied character to separate the hours minutes and seconds (default ':')"
   (let ((thisuniversaltime (unix->universal-time a-unix-time)))
     (multiple-value-bind (second minute hour date month year)
       (decode-universal-time thisuniversaltime)
       (if (and (not just-date) (not just-time))
-        (format nil "~d-~2,'0d-~2,'0d ~d:~2,'0d:~2,'0d" year month date hour minute second)
+        (format nil "~d-~2,'0d-~2,'0d ~d~A~2,'0d~A~2,'0d" year month date hour TIME-SEP minute TIME-SEP second)
         (if just-date
           (format nil "~d-~2,'0d-~2,'0d" year month date)
-          (format nil "~d:~2,'0d:~2,'0d" hour minute second))))))
+          (format nil "~d~A~2,'0d~A~2,'0d" hour TIME-SEP minute TIME-SEP second))))))
 
 
-(defun get-current-time (&key (just-date nil) (just-time nil))
+(defun get-current-time (&key (just-date nil) (just-time nil) (time-sep ":"))
   "Uses `make-pretty-time` to get the current datetime"
   (make-pretty-time (-<> (get-universal-time) universal->unix-time)
-                    :just-date just-date :just-time just-time))
+                    :just-date just-date :just-time just-time :time-sep time-sep))
 
 ;---------------------------------------------------------;
 
@@ -501,7 +508,7 @@
               (xpath:node-set (for-each-node-set  (index! value! ,tmp)      ,@body))
               (stream         (for-each-stream    (index! value! ,tmp)      ,@body)))))))
        (sb-sys:interactive-interrupt ()
-         (die (format nil "~%~ALoop aborted. Bailing out.~A~%" +red-bold+ +reset-terminal-color+))))))
+         (die "~ALoop aborted. Bailing out.~%")))))
 
 (defmacro for-each-list ((index value a-list) &body body)
   `(let ((,index -1))
