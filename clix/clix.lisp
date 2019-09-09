@@ -12,7 +12,6 @@
   (:use :common-lisp :sb-ext)
   (:export :slurp
            :barf
-           :explain
            :die
            :advise
            :or-die
@@ -209,13 +208,82 @@
 (set-dispatch-macro-character #\# #\? #'ignore-the-errors-wrapper)
 
 
+(defun |•-reader| (stream char)
+  "Alternate double quote"
+  (declare (ignore char))
+  (let (chars)
+    (do ((prev (read-char stream) curr)
+         (curr (read-char stream) (read-char stream)))
+        ((char= curr #\Bullet) (push prev chars))
+      (push prev chars))
+    (coerce (nreverse chars) 'string)))
+
+(set-macro-character #\Bullet #'|•-reader|)
 
 
-;---------------------------------------------------------;
+(defun |ensure-not-null| (stream char)
+  "Reader macro to check if symbol is null,
+   otherwise, pass it on"
+  (declare (ignore char))
+  (let ((sexp (read stream t)))
+    `(progn
+       (aif (eval ',sexp)
+            it!
+            (error "its null")))))
+
+(set-macro-character #\Ø #'|ensure-not-null|)
 
 
+(defun |if-null->this| (stream char)
+  "Reader macro that takes to s-expressions.
+   If the first evaluates to not null, it is returned.
+   If the first evaluates to null, the second s-expression is returned"
+  (declare (ignore char))
+  (let ((sexp (read stream t))
+        (replacement (read stream t))
+        (res  (gensym)))
+    `(let ((,res ,sexp))
+       (if ,res ,res ,replacement))))
+
+(set-macro-character #\? #'|if-null->this|)
 
 
+(defun |«-reader| (stream char)
+  "Examples:
+     « (/ 3 1) or die error! »        ; returns 3
+     « (/ 3 0) or warn error! »       ; stderrs error, continues, and returns NIL
+     « (/ 3 0) or die error! »        ; dies with error message
+     « 3 or die error! »              ; returns 3
+     « nil or die error! »            ; dies because atom preceding `or` is NIL"
+  (let ((err-mess     "« reader macro not written to specification")
+        (ender        "»")
+        (before       (read stream))
+        (theor        (read stream))
+        (theoperator  (read stream))
+        (after        (read stream))
+        (theend-p     (symbol-name (read stream)))
+        (res          (gensym)))
+    ; syntax error checking
+    (unless (string= theend-p ender) (die err-mess))
+    (unless (string= (symbol-name theor) "OR") (die err-mess))
+    (cond
+      ((consp before)
+       (cond
+         ((string= "DIE" (symbol-name theoperator))
+           `(or-die (,after) ,before))
+         ((string= "WARN" (symbol-name theoperator))
+           `(or-die (,after :errfun #'advise) ,before))))
+      ((atom before)
+       (cond
+         ((string= "DIE" (symbol-name theoperator))
+           `(if ,before ,before (die ,after)))
+         ((string= "WARN" (symbol-name theoperator))
+           `(if ,before ,before (advise ,after))))))))
+
+(set-macro-character #\« #'|«-reader|)
+
+; --------------------------------------------------------------- ;
+; --------------------------------------------------------------- ;
 
 
 ;---------------------------------------------------------;
@@ -238,12 +306,11 @@
                           :if-does-not-exist :create)
     (funcall printfn contents stream)))
 
-
-(defmacro explain (message &rest body)
-  "prints MESSAGE to standard output before eval-ing BODY"
-  `(progn (format t "~A~%" ,message) ,@body))
-
-; reader macro for this?
+(defun get-size (afile &key (just-bytes nil))
+  "Uses `du` to return just the size of the provided file.
+   `just-bytes` ensures that the size is only counted in bytes (returns integer) [default nil]"
+  (let ((result   (~r (zsh (format nil "du ~A '~A'" (if just-bytes "-sb" "") afile)) "\\s+.*$" "")))
+    (if just-bytes (parse-integer result) result)))
 
 
 (defun die (message &key (status 1) (red-p t))
@@ -353,12 +420,14 @@
 (defun zsh (acommand &key (dry-run nil)
                           (err-fun #'(lambda (code stderr) (error (format nil "~A (~A)" stderr code))))
                           (echo nil)
-                          (enc *clix-external-format*))
+                          (enc *clix-external-format*)
+                          (split nil))
   "Runs command `acommand` through the ZSH shell specified by the global *clix-zsh*
    `dry-run` just prints the command (default nil)
    `err-fun` takes a function that takes an error code and the STDERR output
    `echo` will print the command before running it
-   `enc` takes a format (default is *clix-external-format* [which is :UTF-8 by default])"
+   `enc` takes a format (default is *clix-external-format* [which is :UTF-8 by default])
+   `split` will separate the stdout by newlines and return a list (default: nil)"
   (flet ((strip (astring)
     (if (string= "" astring)
       astring
@@ -375,7 +444,9 @@
              (retcode     (process-exit-code theprocess)))
         (when (> retcode 0)
           (funcall err-fun retcode (strip (get-output-stream-string errs))))
-        (values (strip (get-output-stream-string outs))
+        (values (if split
+                  (~s (get-output-stream-string outs) "\\n")
+                  (strip (get-output-stream-string outs)))
                 (strip (get-output-stream-string errs))
                 retcode)))))
 ; --------------------------------------------------------------- ;
@@ -844,95 +915,18 @@
 ; --------------------------------------------------------------- ;
 ; --------------------------------------------------------------- ;
 
-; interesting reader macros
-
-(defun |•-reader| (stream char)
-  "Alternate double quote"
-  (declare (ignore char))
-  (let (chars)
-    (do ((prev (read-char stream) curr)
-         (curr (read-char stream) (read-char stream)))
-        ((char= curr #\Bullet) (push prev chars))
-      (push prev chars))
-    (coerce (nreverse chars) 'string)))
-
-(set-macro-character #\Bullet #'|•-reader|)
-
-
-(defun |ensure-not-null| (stream char)
-  "Reader macro to check if symbol is null,
-   otherwise, pass it on"
-  (declare (ignore char))
-  (let ((sexp (read stream t)))
-    `(progn
-       (aif (eval ',sexp)
-            it!
-            (error "its null")))))
-
-(set-macro-character #\Ø #'|ensure-not-null|)
-
-
-(defun |if-null->this| (stream char)
-  "Reader macro that takes to s-expressions.
-   If the first evaluates to not null, it is returned.
-   If the first evaluates to null, the second s-expression is returned"
-  (declare (ignore char))
-  (let ((sexp (read stream t))
-        (replacement (read stream t))
-        (res  (gensym)))
-    `(let ((,res ,sexp))
-       (if ,res ,res ,replacement))))
-
-(set-macro-character #\? #'|if-null->this|)
-
-
-(defun |«-reader| (stream char)
-  "Examples:
-     « (/ 3 1) or die error! »        ; returns 3
-     « (/ 3 0) or warn error! »       ; stderrs error, continues, and returns NIL
-     « (/ 3 0) or die error! »        ; dies with error message
-     « 3 or die error! »              ; returns 3
-     « nil or die error! »            ; dies because atom preceding `or` is NIL"
-  (let ((err-mess     "« reader macro not written to specification")
-        (ender        "»")
-        (before       (read stream))
-        (theor        (read stream))
-        (theoperator  (read stream))
-        (after        (read stream))
-        (theend-p     (symbol-name (read stream)))
-        (res          (gensym)))
-    ; syntax error checking
-    (unless (string= theend-p ender) (die err-mess))
-    (unless (string= (symbol-name theor) "OR") (die err-mess))
-    (cond
-      ((consp before)
-       (cond
-         ((string= "DIE" (symbol-name theoperator))
-           `(or-die (,after) ,before))
-         ((string= "WARN" (symbol-name theoperator))
-           `(or-die (,after :errfun #'advise) ,before))))
-      ((atom before)
-       (cond
-         ((string= "DIE" (symbol-name theoperator))
-           `(if ,before ,before (die ,after)))
-         ((string= "WARN" (symbol-name theoperator))
-           `(if ,before ,before (advise ,after))))))))
-
-(set-macro-character #\« #'|«-reader|)
-
-; --------------------------------------------------------------- ;
-; --------------------------------------------------------------- ;
-
 ; more
 
-(defmacro debug-these (avar &rest therest)
+(defmacro debug-these (&rest therest)
   """
   Macro that takes an arbitrary number of arguments,
   prints the symbol, and then prints it's evaluated value
   (for debugging)
+  ; https://www.reddit.com/r/Common_Lisp/comments/d0agxj/question_about_macros_and_lexical_scoping/
   """
-  (let ((whole (cons avar therest)))
-    `(loop for i in ',whole do (format t "~15S -> ~S~%" i (eval i)))))
+  (flet ((debug (this)
+      `(format t "~20S -> ~S~%" ',this ,this)))
+    `(progn ,@(mapcar #'debug therest))))
 
 
 (defmacro with-a-file (filename key &body body)
