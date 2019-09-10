@@ -235,7 +235,7 @@
 
 
 (defun |if-null->this| (stream char)
-  "Reader macro that takes to s-expressions.
+  "Reader macro that takes two s-expressions.
    If the first evaluates to not null, it is returned.
    If the first evaluates to null, the second s-expression is returned"
   (declare (ignore char))
