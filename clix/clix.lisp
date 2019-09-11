@@ -421,12 +421,14 @@
                           (err-fun #'(lambda (code stderr) (error (format nil "~A (~A)" stderr code))))
                           (echo nil)
                           (enc *clix-external-format*)
+                          (in  t)
                           (split nil))
   "Runs command `acommand` through the ZSH shell specified by the global *clix-zsh*
    `dry-run` just prints the command (default nil)
    `err-fun` takes a function that takes an error code and the STDERR output
    `echo` will print the command before running it
    `enc` takes a format (default is *clix-external-format* [which is :UTF-8 by default])
+   `in` t is inherited STDIN. nil is /dev/null. (default t)
    `split` will separate the stdout by newlines and return a list (default: nil)"
   (flet ((strip (astring)
     (if (string= "" astring)
@@ -438,6 +440,7 @@
       (let* ((outs        (make-string-output-stream))
              (errs        (make-string-output-stream))
              (theprocess  (run-program *clix-zsh* `("-c" ,acommand)
+                                       :input t
                                        :output outs
                                        :error  errs
                                        :external-format enc))
