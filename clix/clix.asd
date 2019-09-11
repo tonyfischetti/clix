@@ -9,5 +9,7 @@
                :alexandria
                :drakma
                :cxml
-               :xpath)
+               :xpath
+               :plump
+               :lquery)
   :components ((:file "clix")))
