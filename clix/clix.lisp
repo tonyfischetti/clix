@@ -113,6 +113,7 @@
 ; (defparameter *clix-output-stream* *standard-output*)
 (defparameter *clix-output-stream* *terminal-io*)
 (defparameter *clix-log-level* 1)
+(defparameter *clix-curly-test* #'eq)
 
 (defparameter *clix-external-format* :UTF-8)
 
@@ -281,6 +282,37 @@
            `(if ,before ,before (advise ,after))))))))
 
 (set-macro-character #\« #'|«-reader|)
+
+; universal indexing operator syntax
+(defun |{-reader| (stream char)
+  (let ((inbetween nil))
+    (let ((chars nil))
+      (do ((prev (read-char stream) curr)
+           (curr (read-char stream) (read-char stream)))
+          ((char= curr #\}) (push prev chars))
+        (push prev chars))
+      (setf inbetween (coerce (nreverse chars) 'string)))
+    (with-input-from-string (s inbetween)
+      (let* ((partone       (read s))
+             (parttwo       (read s)))
+        `(get-at ,partone ,parttwo)))))
+
+(defmethod get-at ((this list) that)
+  (cond ((and (listp (car this)) (not (alexandria:proper-list-p (car this))))
+               (cdr (assoc that this :test *clix-curly-test*)))
+        (t (nth that this))))
+
+(defmethod get-at ((this simple-vector) that)
+  (svref this that))
+
+(defmethod get-at ((this vector) that)
+  (aref this that))
+
+(defmethod get-at ((this hash-table) that)
+  (gethash that this))
+
+(set-macro-character #\{ #'|{-reader|)
+
 
 ; --------------------------------------------------------------- ;
 ; --------------------------------------------------------------- ;

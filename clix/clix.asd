@@ -11,5 +11,6 @@
                :cxml
                :xpath
                :plump
-               :lquery)
+               :lquery
+               :cl-json)
   :components ((:file "clix")))
