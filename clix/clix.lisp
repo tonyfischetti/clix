@@ -314,6 +314,16 @@
 
 (set-macro-character #\{ #'|{-reader|)
 
+(defun (setf get-at) (new this that)
+  (cond
+    ((simple-vector-p this)         (setf (svref this that) new))
+    ((vectorp this)                 (setf (aref this that) new))
+    ((hash-table-p this)            (setf (gethash that this) new))
+    ((and (listp (car this)) (not (alexandria:proper-list-p (car this))))
+                                    (setf (cdr (assoc that this :test *clix-curly-test*)) new))
+    ((listp this)                   (setf (nth that this) new))))
+
+
 ; --------------------------------------------------------------- ;
 ; --------------------------------------------------------------- ;
 
