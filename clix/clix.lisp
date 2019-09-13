@@ -284,7 +284,7 @@
 (set-macro-character #\« #'|«-reader|)
 
 ; universal indexing operator syntax
-(defun |{-reader| (stream char)
+(defun |sq-reader| (stream char)
   (let ((inbetween nil))
     (let ((chars nil))
       (do ((prev (read-char stream) curr)
@@ -295,24 +295,29 @@
     (with-input-from-string (s inbetween)
       (let* ((partone       (read s))
              (parttwo       (read s)))
-        `(get-at ,partone ,parttwo)))))
+        (let ((tmp (eval partone)))
+          (cond
+            ((and (listp tmp) (listp (car tmp)) (not (alexandria:proper-list-p (car tmp))))
+                                    `(get-at-alist ',tmp ,parttwo))
+            ((simple-vector-p tmp)  `(get-at-simple-vector ,tmp ,parttwo))
+            ((listp tmp)            `(get-at-list ',tmp ,parttwo))
+            ((hash-table-p tmp)     `(get-at-hash ,tmp ,parttwo))
+            )
+          )))))
 
-(defmethod get-at ((this list) that)
-  (cond ((and (listp (car this)) (not (alexandria:proper-list-p (car this))))
-               (cdr (assoc that this :test *clix-curly-test*)))
-        (t (nth that this))))
+(defmacro get-at-simple-vector (this that)
+  `(svref ,this ,that))
 
-(defmethod get-at ((this simple-vector) that)
-  (svref this that))
+(defmacro get-at-list (this that)
+  `(nth ,that ,this))
 
-(defmethod get-at ((this vector) that)
-  (aref this that))
+(defmacro get-at-alist (this that)
+  `(cdr (assoc ,that ,this)))
 
-(defmethod get-at ((this hash-table) that)
-  (gethash that this))
+(defmacro get-at-hash (this that)
+  `(gethash ,that ,this))
 
-(set-macro-character #\{ #'|{-reader|)
-
+(set-macro-character #\{ #'|sq-reader| )
 
 ; --------------------------------------------------------------- ;
 ; --------------------------------------------------------------- ;
@@ -593,9 +598,9 @@
   (let ((tmp (gensym)))
     `(handler-case
        (let ((index!    -1)
-           (key!      nil)
-           (value!    nil)
-           (,tmp      ,a-thing))
+             (key!      nil)
+             (value!    nil)
+             (,tmp      ,a-thing))
       (declare (ignorable index!))
       (declare (ignorable key!))
       (declare (ignorable value!))
