@@ -312,6 +312,12 @@
 (defmethod get-at ((this hash-table) that)
   (gethash that this))
 
+(defmethod get-at ((this structure-object) that)
+  (slot-value this that))
+
+(defmethod get-at ((this standard-object) that)
+  (slot-value this that))
+
 (set-macro-character #\{ #'|{-reader|)
 
 (defun (setf get-at) (new this that)
@@ -319,9 +325,12 @@
     ((simple-vector-p this)         (setf (svref this that) new))
     ((vectorp this)                 (setf (aref this that) new))
     ((hash-table-p this)            (setf (gethash that this) new))
-    ((and (listp (car this)) (not (alexandria:proper-list-p (car this))))
+    ((and (listp this) (listp (car this)) (not (alexandria:proper-list-p (car this))))
                                     (setf (cdr (assoc that this :test *clix-curly-test*)) new))
-    ((listp this)                   (setf (nth that this) new))))
+    ((listp this)                   (setf (nth that this) new))
+    ((typep this 'structure-object) (setf (slot-value this that) new))
+    ((typep this 'standard-object)  (setf (slot-value this that) new))
+    ))
 
 
 ; --------------------------------------------------------------- ;
