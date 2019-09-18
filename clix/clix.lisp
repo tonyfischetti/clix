@@ -67,6 +67,7 @@
            :*clix-output-stream*
            :*clix-external-format*
            :*clix-log-level*
+           :*clix-curly-test*
            :*clix-zsh*
            :ignore-the-errors-wrapper
            :+red-bold+
