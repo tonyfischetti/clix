@@ -104,6 +104,7 @@
            :if-this->then
            :with-time
            :time-for-humans
+           :time!
            ))
 (in-package :clix)
 
