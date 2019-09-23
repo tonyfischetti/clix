@@ -57,6 +57,7 @@
            :set-hash
            :get-hash
            :rem-hash
+           :alistp
            :set-alist
            :get-alist
            :rem-alist
@@ -101,6 +102,8 @@
            :defparams
            :if->then
            :if-this->then
+           :with-time
+           :time-for-humans
            ))
 (in-package :clix)
 
@@ -300,9 +303,8 @@
         `(get-at ,partone ,parttwo)))))
 
 (defmethod get-at ((this list) that)
-  (cond ((and (listp (car this)) (not (alexandria:proper-list-p (car this))))
-               (cdr (assoc that this :test *clix-curly-test*)))
-        (t (nth that this))))
+  (cond ((alistp this)        (cdr (assoc that this :test *clix-curly-test*)))
+        (t                    (nth that this))))
 
 (defmethod get-at ((this simple-vector) that)
   (svref this that))
@@ -326,8 +328,7 @@
     ((simple-vector-p this)         (setf (svref this that) new))
     ((vectorp this)                 (setf (aref this that) new))
     ((hash-table-p this)            (setf (gethash that this) new))
-    ((and (listp this) (listp (car this)) (not (alexandria:proper-list-p (car this))))
-                                    (setf (cdr (assoc that this :test *clix-curly-test*)) new))
+    ((alistp this)                  (setf (cdr (assoc that this :test *clix-curly-test*)) new))
     ((listp this)                   (setf (nth that this) new))
     ((typep this 'structure-object) (setf (slot-value this that) new))
     ((typep this 'standard-object)  (setf (slot-value this that) new))
@@ -420,6 +421,12 @@
 (defun rem-hash (ht key)
   "Remove KEY in hash-table HT"
   (remhash key ht))
+
+(defun alistp (something)
+  "Test is something is an alist"
+  (and (listp something)
+       (every #'consp something)))
+
 
 (defmacro set-alist (aalist key value &key (test #'eq))
   "Adds `key` and `value` to an alist `aalist`
@@ -1081,6 +1088,28 @@
 
 
 
+
+(defmacro with-time (&body aform)
+  "Anaphoric macro that executes the car of the body and
+   binds the seconds of execution time to TIME!. Then
+   all the other forms in the body are executed"
+  (let ((began      (gensym))
+        (ended      (gensym)))
+    `(let ((time! nil))
+       (setq ,began (get-universal-time))
+       ,(car aform)
+       (setq ,ended (get-universal-time))
+       (setq time! (- ,ended ,began))
+       ,@(cdr aform))))
+
+
+(defun time-for-humans (seconds)
+  "Converts SECONDS into minutes, hours, or days (based on magnitude"
+  (cond
+    ((> seconds 86400)        (format nil "~$ days" (/ seconds 86400)))
+    ((> seconds 3600)         (format nil "~$ hours" (/ seconds 3600)))
+    ((> seconds 60)           (format nil "~$ minutes" (/ seconds 60)))
+    ((< seconds 60)           (format nil "~A seconds" seconds))))
 
 
 
