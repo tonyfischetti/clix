@@ -388,7 +388,6 @@
      (error (error!)
        (funcall ,errfun (format nil "~A" ,message)))))
 
-
 (defmacro die-if-null (avar &rest therest)
   "Macro to check if any of the supplied arguments are null"
   (let ((whole (cons avar therest)))
@@ -401,8 +400,6 @@
    (format *error-output* "~A~A~A~%" (if yellow-p +yellow-bold+ "")
                                      message
                                      (if yellow-p +reset-terminal-color+ "")))
-
-
 
 (defmacro set-hash (aht akey aval)
   (with-gensyms (theht thekey theval)
@@ -512,6 +509,7 @@
                   (strip (get-output-stream-string outs)))
                 (strip (get-output-stream-string errs))
                 retcode)))))
+
 ; --------------------------------------------------------------- ;
 
 
@@ -551,34 +549,6 @@
                     :just-date just-date :just-time just-time :time-sep time-sep))
 
 ;---------------------------------------------------------;
-
-
-; --------------------------------------------------------------- ;
-; XML stuff
-
-(defun request (aurl)
-  (drakma:http-request aurl))
-
-(defun xml-parse (astring)
-  (cxml:parse astring (cxml-dom:make-dom-builder)))
-
-(defun xml-parse-file (afile)
-  (cxml:parse-file afile (cxml-dom:make-dom-builder)))
-
-(defun xpath (adom anxpath)
-  (xpath:evaluate anxpath adom))
-
-(defun xpath-1 (adom anxpath)
-  (xpath:first-node (xpath adom anxpath)))
-
-(defun xml-name (andom)
-  (dom:tag-name andom))
-
-(defun xml-text (andom)
-  (xpath:string-value andom))
-
-
-; --------------------------------------------------------------- ;
 
 
 ;---------------------------------------------------------;
@@ -783,14 +753,6 @@
        (setf (documentation ',short 'function) (documentation ',long 'function))
 ',short)))
 
-; (abbr ds-bind destructuring-bind)
-; (abbr mv-bind multiple-value-bind)
-; (abbr print# print-hash-table)
-; (abbr get# gethash (key hashtable &optional default))
-; (abbr set# sethash)
-; (abbr getset# getsethash)
-; (abbr rem# remhash)
-; (abbr λ lambda)
 
 (defun str-join (delim strings)
   "Join STRINGS with DELIM."
@@ -920,65 +882,7 @@
   "Alias to str-subset"
   (str-subset alist aregex))
 
-
 ; --------------------------------------------------------------- ;
-; --------------------------------------------------------------- ;
-
-; very hacky interface to R for emergencies
-; because LITERALLY NOTHING ELSE WORKS!
-
-(defun r-get (acommand &key (type *read-default-float-format*) (what :raw))
-  "Runs a command through R and returns the result.
-    `:type` specifies what parse-float:parse-float should use to parse the result
-    `:what` specifies the intended format (:single (atom) :vector, or :raw (default)"
-  (let* ((newcom (str-replace-all acommand "'" (format nil "~C" #\QUOTATION_MARK)))
-         (result (zsh (format nil "R --silent -e '~A'" newcom))))
-    (if (eq what :raw)
-      result
-      (-<>
-        ((lambda (x) x) result)
-        (str-split <> "\\n")
-        (remove-if-not (lambda (x) (str-detect x "^\\s*\\[\\d+\\]")) <>)
-        (str-join "" <>)
-        (str-replace-all <> "\\[\\d+\\]" "")
-        (str-split <> "\\s+")
-        (remove-if (lambda (x) (string= "" x)) <>)
-        ((lambda (x)
-           (cond
-             ((eq what :vector) (mapcar (lambda (y) (parse-float:parse-float y :type type)) x))
-             ((eq what :single)
-                  (progn
-                    (let ((res (mapcar (lambda (y) (parse-float:parse-float y :type type)) x)))
-                      (if (> (length res) 1)
-                        (error "not vector of length 1")
-                        (car res)))))
-             (t x))) <>)))))
-
-(defmacro with-r (what &body body)
-  "Macro that will take all the strings given in the body and
-   run them at once in R. The first argument specifies the
-   intended return type (:single :vector :raw)"
-  (let ((thecom (gensym)))
-    `(let ((,thecom (str-join ";" ',body)))
-       (r-get ,thecom :what ,what))))
-
-
-; --------------------------------------------------------------- ;
-; --------------------------------------------------------------- ;
-
-; alexandria re-exports
-
-(defun alist->hash-table (analist &rest htargs)
-  (apply #'alexandria:alist-hash-table (cons analist htargs)))
-  ; (alexandria:alist-hash-table analist htargs))
-
-(defun hash-table->alist (analist)
-  (alexandria:hash-table-alist analist))
-
-; --------------------------------------------------------------- ;
-; --------------------------------------------------------------- ;
-
-; more
 
 (defmacro debug-these (&rest therest)
   """
@@ -1088,8 +992,6 @@
                (t            ,thedefault)))))))
 
 
-
-
 (defmacro with-time (&body aform)
   "Anaphoric macro that executes the car of the body and
    binds the seconds of execution time to TIME!. Then
@@ -1114,3 +1016,74 @@
 
 
 
+; --------------------------------------------------------------- ;
+; HTML/XML stuff
+
+(abbr request drakma:http-request)
+
+(defun xml-parse (astring)
+  (cxml:parse astring (cxml-dom:make-dom-builder)))
+
+(defun xml-parse-file (afile)
+  (cxml:parse-file afile (cxml-dom:make-dom-builder)))
+
+(abbr xpath xpath:evaluate)
+
+(abbr xml-text xpath:string-value)
+
+
+; --------------------------------------------------------------- ;
+; other abbreviation
+
+(abbr alist->hash-table alexandria:alist-hash-table)
+(abbr hash-table->alist alexandria:hash-table-alist)
+
+; (abbr ds-bind destructuring-bind)
+; (abbr mv-bind multiple-value-bind)
+; (abbr print# print-hash-table)
+; (abbr get# gethash (key hashtable &optional default))
+; (abbr set# sethash)
+; (abbr getset# getsethash)
+; (abbr rem# remhash)
+; (abbr λ lambda)
+
+; --------------------------------------------------------------- ;
+; --------------------------------------------------------------- ;
+
+; very hacky interface to R for emergencies
+; because LITERALLY NOTHING ELSE WORKS!
+
+(defun r-get (acommand &key (type *read-default-float-format*) (what :raw))
+  "Runs a command through R and returns the result.
+    `:type` specifies what parse-float:parse-float should use to parse the result
+    `:what` specifies the intended format (:single (atom) :vector, or :raw (default)"
+  (let* ((newcom (str-replace-all acommand "'" (format nil "~C" #\QUOTATION_MARK)))
+         (result (zsh (format nil "R --silent -e '~A'" newcom))))
+    (if (eq what :raw)
+      result
+      (-<>
+        ((lambda (x) x) result)
+        (str-split <> "\\n")
+        (remove-if-not (lambda (x) (str-detect x "^\\s*\\[\\d+\\]")) <>)
+        (str-join "" <>)
+        (str-replace-all <> "\\[\\d+\\]" "")
+        (str-split <> "\\s+")
+        (remove-if (lambda (x) (string= "" x)) <>)
+        ((lambda (x)
+           (cond
+             ((eq what :vector) (mapcar (lambda (y) (parse-float:parse-float y :type type)) x))
+             ((eq what :single)
+                  (progn
+                    (let ((res (mapcar (lambda (y) (parse-float:parse-float y :type type)) x)))
+                      (if (> (length res) 1)
+                        (error "not vector of length 1")
+                        (car res)))))
+             (t x))) <>)))))
+
+(defmacro with-r (what &body body)
+  "Macro that will take all the strings given in the body and
+   run them at once in R. The first argument specifies the
+   intended return type (:single :vector :raw)"
+  (let ((thecom (gensym)))
+    `(let ((,thecom (str-join ";" ',body)))
+       (r-get ,thecom :what ,what))))
