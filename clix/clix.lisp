@@ -377,8 +377,8 @@
 
 
 (defmacro or-die ((message &key (errfun #'die)) &body body)
-  "anaphoric macro that binds ERR! to the error
-   It takes a MESSAGE with can include ERR! (via
+  "anaphoric macro that binds ERROR! to the error
+   It takes a MESSAGE with can include ERROR! (via
    (format nil...) for example) It also takes ERRFUN
    which it will FUNCALL with the MESSAGE. The default
    is to DIE, but you can, for example, PRINC instead"
