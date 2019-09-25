@@ -10,7 +10,9 @@
 
 (defpackage :clix
   (:use :common-lisp :sb-ext)
-  (:export :slurp
+  (:export :fn
+           :ft
+           :slurp
            :barf
            :die
            :advise
@@ -78,6 +80,10 @@
            :+magenta-bold+
            :+cyan-bold+
            :+reset-terminal-color+
+           :red
+           :yellow
+           :green
+           :cyan
            :re-compile
            :str-split
            :str-replace
@@ -112,6 +118,17 @@
 
 (pushnew :clix *features*)
 
+
+
+;---------------------------------------------------------;
+; formatting
+
+(defmacro fn (&rest everything)
+  `(format nil ,@everything))
+
+(defmacro ft (&rest everything)
+  `(format t ,@everything))
+
 ;---------------------------------------------------------;
 ; parameters
 
@@ -129,6 +146,11 @@
 (defvar +magenta-bold+          (format nil "~c[35;1m" #\ESC))
 (defvar +cyan-bold+             (format nil "~c[36;1m" #\ESC))
 (defvar +reset-terminal-color+  (format nil "~c[0m"    #\ESC))
+
+(defmacro green   (&rest everything) `(fn "~A~A~A" +green-bold+   (fn ,@everything) +reset-terminal-color+))
+(defmacro red     (&rest everything) `(fn "~A~A~A" +red-bold+     (fn ,@everything) +reset-terminal-color+))
+(defmacro yellow  (&rest everything) `(fn "~A~A~A" +yellow-bold+  (fn ,@everything) +reset-terminal-color+))
+(defmacro cyan    (&rest everything) `(fn "~A~A~A" +cyan-bold+    (fn ,@everything) +reset-terminal-color+))
 
 (defparameter *clix-zsh* "/usr/local/bin/zsh")
 
