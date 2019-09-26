@@ -27,7 +27,7 @@
            :-<>               :<>                 :zsh
            :universal->unix-time                  :unix->universal-time
            :get-unix-time     :make-pretty-time   :get-current-time
-           :with-time         :time-for-humans    :time
+           :with-time         :time-for-humans    :time!
            :progress          :break!             :continue!
            :index!            :value!             :key!
            :for-each-line     :for-each-list      :for-each-hash
