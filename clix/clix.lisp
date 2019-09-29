@@ -105,6 +105,74 @@
 
 ; ------------------------------------------------------- ;
 
+; --------------------------------------------------------------- ;
+; cl-ppcre wrappers where the arguments are re-arranged to make sense to me
+
+(defmacro re-compile (&rest everything)
+  `(cl-ppcre:create-scanner ,@everything))
+
+(defmacro str-split (astr sep &rest everything)
+  "Wrapper around cl-ppcre:split with string first"
+  `(cl-ppcre:split ,sep ,astr ,@everything))
+
+(defmacro str-replace (astr from to &rest everything)
+  "Wrapper around cl-ppcre:regex-replace with string first"
+  `(cl-ppcre:regex-replace ,from ,astr ,to ,@everything))
+
+(defmacro str-replace-all (astr from to &rest everything)
+  "Wrapper around cl-ppcre:regex-replace-all with string first"
+  `(cl-ppcre:regex-replace-all ,from ,astr ,to ,@everything))
+
+(defmacro str-detect (astr pattern &rest everything)
+  "Returns true if `pattern` matches `astr`
+   Wrapper around cl-ppcre:scan"
+  `(if (cl-ppcre:scan ,pattern ,astr ,@everything) t nil))
+
+(declaim (inline str-subset))
+(defun str-subset (anlist pattern)
+  "Returns all elements that match pattern"
+  (let ((ret nil))
+    (for-each-list anlist
+      (when (str-detect value! pattern)
+        (setq ret (append ret (list value!)))))
+    ret))
+
+(declaim (inline str-scan-to-strings))
+(defun str-scan-to-strings (astr pattern)
+  "Wrapper around cl-ppcre:scan-to-strings with string first
+   and only returns the important part (the vector of matches)"
+  (multiple-value-bind (dontneed need)
+    ; (declaim (ignorable dontneed))
+    (cl-ppcre:scan-to-strings pattern astr)
+    need))
+
+(defmacro ~m (&rest everything)
+  "Alias to str-detect"
+  `(str-detect ,@everything))
+
+(defmacro ~r (&rest everything)
+  "Alias to str-replace (one"
+  `(str-replace ,@everything))
+
+(defmacro ~ra (&rest everything)
+  "Alias to str-replace-all"
+  `(str-replace-all ,@everything))
+
+(defmacro ~s (&rest everything)
+  "Alias to str-split"
+  `(str-split ,@everything))
+
+(defmacro ~f (&rest everything)
+  "Alias to str-subset"
+  `(str-subset ,@everything))
+
+(defmacro ~c (&rest everything)
+  "Alias to re-compile"
+  `(re-compile ,@everything))
+
+; --------------------------------------------------------------- ;
+
+
 ;---------------------------------------------------------;
 ; convenience
 
@@ -742,74 +810,6 @@
 
 ; --------------------------------------------------------------- ;
 
-
-; --------------------------------------------------------------- ;
-; cl-ppcre wrappers where the arguments are re-arranged to make sense to me
-
-(defmacro re-compile (&rest everything)
-  `(cl-ppcre:create-scanner ,@everything))
-
-(defmacro str-split (astr sep &rest everything)
-  "Wrapper around cl-ppcre:split with string first"
-  `(cl-ppcre:split ,sep ,astr ,@everything))
-
-(defmacro str-replace (astr from to &rest everything)
-  "Wrapper around cl-ppcre:regex-replace with string first"
-  `(cl-ppcre:regex-replace ,from ,astr ,to ,@everything))
-
-(defmacro str-replace-all (astr from to &rest everything)
-  "Wrapper around cl-ppcre:regex-replace-all with string first"
-  `(cl-ppcre:regex-replace-all ,from ,astr ,to ,@everything))
-
-(defmacro str-detect (astr pattern &rest everything)
-  "Returns true if `pattern` matches `astr`
-   Wrapper around cl-ppcre:scan"
-  `(if (cl-ppcre:scan ,pattern ,astr ,@everything) t nil))
-
-(declaim (inline str-subset))
-(defun str-subset (anlist pattern)
-  "Returns all elements that match pattern"
-  (let ((ret nil))
-    (for-each-list anlist
-      (when (str-detect value! pattern)
-        (setq ret (append ret (list value!)))))
-    ret))
-
-(declaim (inline str-scan-to-strings))
-(defun str-scan-to-strings (astr pattern)
-  "Wrapper around cl-ppcre:scan-to-strings with string first
-   and only returns the important part (the vector of matches)"
-  (multiple-value-bind (dontneed need)
-    ; (declaim (ignorable dontneed))
-    (cl-ppcre:scan-to-strings pattern astr)
-    need))
-
-
-(defmacro ~m (&rest everything)
-  "Alias to str-detect"
-  `(str-detect ,@everything))
-
-(defmacro ~r (&rest everything)
-  "Alias to str-replace (one"
-  `(str-replace ,@everything))
-
-(defmacro ~ra (&rest everything)
-  "Alias to str-replace-all"
-  `(str-replace-all ,@everything))
-
-(defmacro ~s (&rest everything)
-  "Alias to str-split"
-  `(str-split ,@everything))
-
-(defmacro ~f (&rest everything)
-  "Alias to str-subset"
-  `(str-subset ,@everything))
-
-(defmacro ~c (&rest everything)
-  "Alias to re-compile"
-  `(re-compile ,@everything))
-
-; --------------------------------------------------------------- ;
 
 
 ; --------------------------------------------------------------- ;
