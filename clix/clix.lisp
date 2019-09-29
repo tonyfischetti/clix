@@ -37,7 +37,7 @@
            :str-replace-all   :str-detect         :str-subset
            :str-scan-to-strings                   :~m
            :~r                :~ra                :~s
-           :~f
+           :~f                :~c
            :debug-these       :with-a-file        :stream!
            :rnorm
            :delim             :defparams          :if->then
@@ -743,35 +743,32 @@
 
 ; --------------------------------------------------------------- ;
 ; cl-ppcre wrappers where the arguments are re-arranged to make sense to me
-(defun re-compile (aregex)
-  (cl-ppcre:create-scanner aregex))
 
-(declaim (inline str-split))
-(defun str-split (astr sep &key (limit))
+(defmacro re-compile (&rest everything)
+  `(cl-ppcre:create-scanner ,@everything))
+
+(defmacro str-split (astr sep &rest everything)
   "Wrapper around cl-ppcre:split with string first"
-  (cl-ppcre:split sep astr :limit limit))
+  `(cl-ppcre:split ,sep ,astr ,@everything))
 
-(declaim (inline str-replace))
-(defun str-replace (astr from to)
+(defmacro str-replace (astr from to &rest everything)
   "Wrapper around cl-ppcre:regex-replace with string first"
-  (cl-ppcre:regex-replace from astr to))
+  `(cl-ppcre:regex-replace ,from ,astr ,to ,@everything))
 
-(declaim (inline str-replace-all))
-(defun str-replace-all (astr from to)
+(defmacro str-replace-all (astr from to &rest everything)
   "Wrapper around cl-ppcre:regex-replace-all with string first"
-  (cl-ppcre:regex-replace-all from astr to))
+  `(cl-ppcre:regex-replace-all ,from ,astr ,to ,@everything))
 
-(declaim (inline str-detect))
-(defun str-detect (astr pattern)
+(defmacro str-detect (astr pattern &rest everything)
   "Returns true if `pattern` matches `astr`
    Wrapper around cl-ppcre:scan"
-  (if (cl-ppcre:scan pattern astr) t nil))
+  `(if (cl-ppcre:scan ,pattern ,astr ,@everything) t nil))
 
 (declaim (inline str-subset))
 (defun str-subset (anlist pattern)
   "Returns all elements that match pattern"
   (let ((ret nil))
-    (for-each anlist
+    (for-each-list anlist
       (when (str-detect value! pattern)
         (setq ret (append ret (list value!)))))
     ret))
@@ -785,30 +782,30 @@
     (cl-ppcre:scan-to-strings pattern astr)
     need))
 
-(declaim (inline ~m))
-(defun ~m (astring aregex)
+
+(defmacro ~m (&rest everything)
   "Alias to str-detect"
-  (str-detect astring aregex))
+  `(str-detect ,@everything))
 
-(declaim (inline ~r))
-(defun ~r (astring from to)
+(defmacro ~r (&rest everything)
   "Alias to str-replace (one"
-  (str-replace astring from to))
+  `(str-replace ,@everything))
 
-(declaim (inline ~ra))
-(defun ~ra (astring from to)
+(defmacro ~ra (&rest everything)
   "Alias to str-replace-all"
-  (str-replace-all astring from to))
+  `(str-replace-all ,@everything))
 
-(declaim (inline ~s))
-(defun ~s (astring aregex &key (limit))
+(defmacro ~s (&rest everything)
   "Alias to str-split"
-  (str-split astring aregex :limit limit))
+  `(str-split ,@everything))
 
-(declaim (inline ~f))
-(defun ~f (alist aregex)
+(defmacro ~f (&rest everything)
   "Alias to str-subset"
-  (str-subset alist aregex))
+  `(str-subset ,@everything))
+
+(defmacro ~c (&rest everything)
+  "Alias to re-compile"
+  `(re-compile ,@everything))
 
 ; --------------------------------------------------------------- ;
 
@@ -1060,3 +1057,4 @@
     `(let ((,thecom (str-join ";" ',body)))
        (r-get ,thecom :what ,what))))
 ; --------------------------------------------------------------- ;
+
