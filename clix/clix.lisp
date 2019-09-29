@@ -12,6 +12,7 @@
   (:use :common-lisp :sb-ext)
   (:export :fn                :ft                 :*clix-output-stream*
            :*clix-log-level*  :*clix-curly-test*  :*clix-external-format*
+           :*clix-log-file*
            :+red-bold+        :+green-bold+       :+yellow-bold+
            :+blue-bold+       :+magenta-bold+     :+cyan-bold+
            :+reset-terminal-color+                :green
@@ -68,7 +69,8 @@
 ; parameters
 
 (defparameter *clix-output-stream* *terminal-io*)
-(defparameter *clix-log-level* 1)
+(defparameter *clix-log-level* 2)
+(defparameter *clix-log-file* "clix-log.out")
 (defparameter *clix-curly-test* #'eq)
 
 (defparameter *clix-external-format* :UTF-8)
@@ -974,19 +976,20 @@
           (thetimingresults   nil)
           (daoutputstream     (make-string-output-stream)))
       `(progn
-         (format *clix-output-stream*
-                 "--------------------~%[~A-~A-~A ~2,'0d:~2,'0d:~2,'0d]~%~%FORM:~%~A~%"
-                 ,year ,month ,date ,hour ,minute ,second
-                 ; (write-to-string ',sexp))
-                 (format nil "λ ~S~%" ',sexp))
-         (let ((daoutputstream (make-string-output-stream)))
-           (let ((*trace-output* daoutputstream))
-             (setq thereturnvalue (progn (time ,sexp))))
-               (setq thetimingresults (prettify-time-output (get-output-stream-string daoutputstream))))
-         (format *clix-output-stream* "RETURNED:~%~A~%" thereturnvalue)
-         (format *clix-output-stream* "~%~A~%--------------------~%~%~%" thetimingresults)
-         (finish-output *clix-output-stream*)
-         thereturnvalue))))
+         (with-a-file *clix-log-file* :a
+           (format stream!
+                   "--------------------~%[~A-~A-~A ~2,'0d:~2,'0d:~2,'0d]~%~%FORM:~%~A~%"
+                   ,year ,month ,date ,hour ,minute ,second
+                   ; (write-to-string ',sexp))
+                   (format nil "λ ~S~%" ',sexp))
+           (let ((daoutputstream (make-string-output-stream)))
+             (let ((*trace-output* daoutputstream))
+               (setq thereturnvalue (progn (time ,sexp))))
+                 (setq thetimingresults (prettify-time-output (get-output-stream-string daoutputstream))))
+           (format stream! "RETURNED:~%~A~%" thereturnvalue)
+           (format stream! "~%~A~%--------------------~%~%~%" thetimingresults)
+           (finish-output stream!)
+           thereturnvalue)))))
 
 
 (defun clix-log-just-echo (stream char arg)
@@ -997,13 +1000,14 @@
     ;       (thereturnvalue     nil)
     ;       (thetimingresults   nil))
       `(progn
-         (format t "~S~%" ',sexp)
-         (format *clix-output-stream* "~%λ ~S~%" ',sexp)
-         (let* ((daoutputstream   (make-string-output-stream))
-                (*trace-output*   daoutputstream)
-                (thereturnvalue   (progn (time ,sexp))))
-           (finish-output *clix-output-stream*)
-           ,thereturnvalue)))))
+         (with-a-file *clix-log-file* :a
+           (format t "~S~%" ',sexp)
+           (format stream! "~%λ ~S~%" ',sexp)
+           (let* ((daoutputstream   (make-string-output-stream))
+                  (*trace-output*   daoutputstream)
+                  (thereturnvalue   (progn (time ,sexp))))
+             (finish-output stream!)
+             ,thereturnvalue))))))
 
 
 (defun clix-log (stream char arg)
