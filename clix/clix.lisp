@@ -33,7 +33,9 @@
            :index!            :value!             :key!
            :for-each-line     :for-each-list      :for-each-hash
            :for-each-vector   :for-each-stream    :for-each-alist
-           :for-each
+           :for-each-emission :for-each
+           :eval-always       :abbr               :str-join
+           :substr            :interpose          :print-hash-table
            :re-compile        :str-split          :str-replace
            :str-replace-all   :str-detect         :str-subset
            :str-scan-to-strings                   :~m
@@ -209,7 +211,7 @@
 (defun die (message &key (status 1) (red-p t))
   "Prints MESSAGE to *ERROR-OUTPUT* and quits with a STATUS (default 1)"
   (format *error-output* "~A~A~A~%" (if red-p +red-bold+ "")
-                                    message
+                                      (fn message)
                                     (if red-p +reset-terminal-color+ ""))
   #+clisp (ext:exit status)
   #+sbcl  (sb-ext:quit :unix-status status))
@@ -564,7 +566,7 @@
   `(return-from this-pass!))
 
 (defmacro for-each-line (a-thing &body body)
-  "(see documentation for `for-each`"
+  "(see documentation for `for-each`)"
   (let ((resolved-fn            (gensym))
         (instream               (gensym)))
     `(handler-case
@@ -577,11 +579,11 @@
               (loop for value! = (read-line ,instream nil)
                     while value! do (progn (incf index!) (block this-pass! ,@body))))))
        (sb-sys:interactive-interrupt ()
-         (die "~ALoop aborted. Bailing out.~%")))))
+         (die "~%Loop aborted. Bailing out.~%")))))
 
 
 (defmacro for-each-list (a-thing &body body)
-  "(see documentation for `for-each`"
+  "(see documentation for `for-each`)"
   (let ((the-list         (gensym)))
     `(handler-case
       (let ((index!       0)
@@ -592,11 +594,11 @@
                   (incf index!)
                   (block this-pass! ,@body))))
        (sb-sys:interactive-interrupt ()
-         (die "~ALoop aborted. Bailing out.~%")))))
+         (die "~%Loop aborted. Bailing out.~%")))))
 
 
 (defmacro for-each-hash (a-thing &body body)
-  "(see documentation for `for-each`"
+  "(see documentation for `for-each`)"
   (let ((the-hash         (gensym)))
     `(handler-case
        (let ((index!      0)
@@ -609,11 +611,11 @@
                                 (setq value! (gethash key! ,the-hash))
                                 (block this-pass! ,@body)))))
        (sb-sys:interactive-interrupt ()
-         (die "~ALoop aborted. Bailing out.~%")))))
+         (die "~%Loop aborted. Bailing out.~%")))))
 
 
 (defmacro for-each-vector (a-thing &body body)
-  "(see documentation for `for-each`"
+  "(see documentation for `for-each`)"
   (let ((the-vector       (gensym)))
     `(handler-case
       (let ((index!       0)
@@ -623,12 +625,12 @@
                 (loop for value! across ,the-vector
                       do (progn (incf index!) (block this-pass! ,@body)))))
        (sb-sys:interactive-interrupt ()
-         (die "~ALoop aborted. Bailing out.~%")))))
+         (die "~%Loop aborted. Bailing out.~%")))))
 
 
 ; USE UNWIND-PROTECT?
 (defmacro for-each-stream (the-stream &body body)
-  "(see documentation for `for-each`"
+  "(see documentation for `for-each`)"
   (let ((instream               (gensym)))
     `(handler-case
        (let ((index!            0)
@@ -638,11 +640,11 @@
               (loop for value! = (read-line ,instream nil)
                     while value! do (progn (incf index!) (block this-pass! ,@body)))))
        (sb-sys:interactive-interrupt ()
-         (die "~ALoop aborted. Bailing out.~%")))))
+         (die "~%Loop aborted. Bailing out.~%")))))
 
 
 (defmacro for-each-alist (aalist &body body)
-  "(see documentation for `for-each`"
+  "(see documentation for `for-each`)"
   (let ((tmp          (gensym))
         (resolved     (gensym)))
     `(handler-case
@@ -656,7 +658,27 @@
                            (setq value! (cdr ,tmp))
                            (block this-pass! ,@body)))))
        (sb-sys:interactive-interrupt ()
-         (die "~ALoop aborted. Bailing out.~%")))))
+         (die "~%Loop aborted. Bailing out.~%")))))
+
+
+(defmacro for-each-emission ((fun astream) &body body)
+  "this works like `for-each` (see documentation for it) but
+   is not automatically dispatched by it so it needs to always
+   be called explicitly). It's first argument is a list of
+   (a) a function that gets repeatedly called each-loop until
+   it returns nil, and
+   (b) an argument to pass to the function (like a stream)
+  (see documentation for `for-each`)"
+  `(handler-case
+     (let ((index!      0)
+           (value!      nil))
+       (block this-loop!
+              (loop for value! = (,fun ,astream)
+                    while value!
+                    do (progn (incf index!)
+                              (block this-pass! ,@body)))))
+     (sb-sys:interactive-interrupt ()
+         (die "~%Loop aborted. Bailing out.~%"))))
 
 
 (defmacro for-each (a-thing &body body)
@@ -908,7 +930,7 @@
       •cosmo•   ->  •kramer•
       •george•  ->  •constanza•
       •elaine•  ->  •benes•
-      •jerry•   -> •seinfeld•)"
+      •jerry•   ->  •seinfeld•)"
   (with-gensyms (thething thetest thedefault)
     (labels ((group-them (alist)
       (unless (null alist)

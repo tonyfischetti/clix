@@ -25,7 +25,7 @@
 (in-package :linedit-system)
 
 ; (defvar *gcc* "/usr/bin/cc")
-(defvar *gcc* "/opt/local/bin/gcc-mp-8")
+(defvar *gcc* "/opt/local/bin/gcc-mp-9")
 
 (defvar *gcc-options*
   #-(or darwin macosx)
