@@ -33,7 +33,7 @@
            :index!            :value!             :key!
            :for-each-line     :for-each-list      :for-each-hash
            :for-each-vector   :for-each-stream    :for-each-alist
-           :for-each-emission :for-each
+           :for-each-yield    :for-each
            :eval-always       :abbr               :str-join
            :substr            :interpose          :print-hash-table
            :re-compile        :str-split          :str-replace
@@ -661,7 +661,7 @@
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
-(defmacro for-each-emission ((fun astream) &body body)
+(defmacro for-each-yield ((fun astream) &body body)
   "this works like `for-each` (see documentation for it) but
    is not automatically dispatched by it so it needs to always
    be called explicitly). It's first argument is a list of
