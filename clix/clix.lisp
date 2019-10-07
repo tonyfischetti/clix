@@ -201,6 +201,44 @@
                           :if-does-not-exist :create)
     (funcall printfn contents stream)))
 
+
+(defun zsh (acommand &key (dry-run nil)
+                          (err-fun #'(lambda (code stderr) (error (format nil "~A (~A)" stderr code))))
+                          (echo nil)
+                          (enc *clix-external-format*)
+                          (in  t)
+                          (split nil))
+  "Runs command `acommand` through the ZSH shell specified by the global *clix-zsh*
+   `dry-run` just prints the command (default nil)
+   `err-fun` takes a function that takes an error code and the STDERR output
+   `echo` will print the command before running it
+   `enc` takes a format (default is *clix-external-format* [which is :UTF-8 by default])
+   `in` t is inherited STDIN. nil is /dev/null. (default t)
+   `split` will separate the stdout by newlines and return a list (default: nil)"
+  (flet ((strip (astring)
+    (if (string= "" astring)
+      astring
+      (subseq astring 0 (- (length astring) 1)))))
+    (when (or echo dry-run)
+      (format t "$ ~A~%" acommand))
+    (unless dry-run
+      (let* ((outs        (make-string-output-stream))
+             (errs        (make-string-output-stream))
+             (theprocess  (run-program *clix-zsh* `("-c" ,acommand)
+                                       :input in
+                                       :output outs
+                                       :error  errs
+                                       :external-format enc))
+             (retcode     (process-exit-code theprocess)))
+        (when (> retcode 0)
+          (funcall err-fun retcode (strip (get-output-stream-string errs))))
+        (values (if split
+                  (~s (get-output-stream-string outs) "\\n")
+                  (strip (get-output-stream-string outs)))
+                (strip (get-output-stream-string errs))
+                retcode)))))
+
+
 (defun get-size (afile &key (just-bytes nil))
   "Uses `du` to return just the size of the provided file.
    `just-bytes` ensures that the size is only counted in bytes (returns integer) [default nil]"
@@ -314,42 +352,6 @@
      <>))
 
 
-(defun zsh (acommand &key (dry-run nil)
-                          (err-fun #'(lambda (code stderr) (error (format nil "~A (~A)" stderr code))))
-                          (echo nil)
-                          (enc *clix-external-format*)
-                          (in  t)
-                          (split nil))
-  "Runs command `acommand` through the ZSH shell specified by the global *clix-zsh*
-   `dry-run` just prints the command (default nil)
-   `err-fun` takes a function that takes an error code and the STDERR output
-   `echo` will print the command before running it
-   `enc` takes a format (default is *clix-external-format* [which is :UTF-8 by default])
-   `in` t is inherited STDIN. nil is /dev/null. (default t)
-   `split` will separate the stdout by newlines and return a list (default: nil)"
-  (flet ((strip (astring)
-    (if (string= "" astring)
-      astring
-      (subseq astring 0 (- (length astring) 1)))))
-    (when (or echo dry-run)
-      (format t "$ ~A~%" acommand))
-    (unless dry-run
-      (let* ((outs        (make-string-output-stream))
-             (errs        (make-string-output-stream))
-             (theprocess  (run-program *clix-zsh* `("-c" ,acommand)
-                                       :input t
-                                       :output outs
-                                       :error  errs
-                                       :external-format enc))
-             (retcode     (process-exit-code theprocess)))
-        (when (> retcode 0)
-          (funcall err-fun retcode (strip (get-output-stream-string errs))))
-        (values (if split
-                  (~s (get-output-stream-string outs) "\\n")
-                  (strip (get-output-stream-string outs)))
-                (strip (get-output-stream-string errs))
-                retcode)))))
-
 ; ------------------------------------------------------- ;
 
 
@@ -357,6 +359,7 @@
 ; experimental reader macros
 (defun ignore-the-errors-wrapper (stream char arg)
   (declare (ignore char))
+  (declare (ignore arg))
   (let ((sexp (read stream t)))
     `(ignore-errors ,sexp)))
 
@@ -410,14 +413,14 @@
      « (/ 3 0) or die error! »        ; dies with error message
      « 3 or die error! »              ; returns 3
      « nil or die error! »            ; dies because atom preceding `or` is NIL"
+  (declare (ignore char))
   (let ((err-mess     "« reader macro not written to specification")
         (ender        "»")
         (before       (read stream))
         (theor        (read stream))
         (theoperator  (read stream))
         (after        (read stream))
-        (theend-p     (symbol-name (read stream)))
-        (res          (gensym)))
+        (theend-p     (symbol-name (read stream))))
     ; syntax error checking
     (unless (string= theend-p ender) (die err-mess))
     (unless (string= (symbol-name theor) "OR") (die err-mess))
@@ -440,6 +443,7 @@
 
 ; universal indexing operator syntax
 (defun |{-reader| (stream char)
+  (declare (ignore char))
   (let ((inbetween nil))
     (let ((chars nil))
       (do ((prev (read-char stream) curr)
@@ -907,6 +911,7 @@
      `(progn  ,@tmp))))
 
 
+; ????
 (defmacro if->then (&body body)
   "Example:
     (if->then
@@ -983,10 +988,7 @@
 ;---------------------------------------------------------;
 ; Experimental logging and reader macros
 (defun prettify-time-output (thetimeoutput)
-  ; (format t "~A~%" (length thetimeoutput))
-  ;(remove-if (lambda (x) (char= #\Return x)) thetimeoutput)
   (subseq thetimeoutput 0 (- (length thetimeoutput) 4)))
-  ; (remove-if (lambda (x) (or (char= #\Linefeed x) (char= #\Return x))) thetimeoutput))
 
 (defun clix-log-verbose (stream char arg)
   ;;;;;; HOW UNHYGENIC IS THIS???!!
