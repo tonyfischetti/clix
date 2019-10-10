@@ -17,10 +17,11 @@
            :+blue-bold+       :+magenta-bold+     :+cyan-bold+
            :+reset-terminal-color+                :green
            :red               :yellow             :cyan
-           :*clix-zsh*        :with-gensyms       :aif
-           :it!
+           :*clix-zsh*        :with-gensyms       :mac
+           :nil!              :aif                :it!
            :slurp             :barf               :get-size
-           :die               :or-die             :die-if-null
+           :die               :or-die             :or-do
+           :die-if-null
            :advise            :error!
            :set-hash          :get-hash           :rem-hash
            :alistp            :set-alist          :get-alist
@@ -99,11 +100,22 @@
 
 
 ;---------------------------------------------------------;
-; Stolen from Practical common lisp
+; Stolen from "Practical Common Lisp"
 (defmacro with-gensyms ((&rest names) &body body)
   "Why mess with the classics"
   `(let ,(loop for n in names collect `(,n (gensym)))
      ,@body))
+
+; Stolen from "On Lisp"
+(defmacro mac (sexp)
+  "Let's you do `(mac (anunquotesmacro))`"
+  `(pprint (macroexpand-1 ',sexp)))
+
+; Adapted from "On Lisp"
+(defmacro nil! (&rest rest)
+  "Sets all the arguments to nil"
+  (let ((tmp (mapcar (lambda (x) `(setf ,x nil)) rest)))
+    `(progn ,@tmp)))
 
 ; ------------------------------------------------------- ;
 
@@ -267,6 +279,16 @@
      (error (error!)
        (funcall ,errfun (format nil "~A" ,message)))))
 
+
+(defmacro or-do (orthis &body body)
+  "anaphoric macro that binds ERROR! to the error.
+   If the body fails, the form ORTHIS gets run."
+  `(handler-case
+     (progn
+       ,@body)
+      (error (error!)
+        ,orthis)))
+
 (defmacro die-if-null (avar &rest therest)
   "Macro to check if any of the supplied arguments are null"
   (let ((whole (cons avar therest)))
@@ -412,7 +434,9 @@
      « (/ 3 0) or warn error! »       ; stderrs error, continues, and returns NIL
      « (/ 3 0) or die error! »        ; dies with error message
      « 3 or die error! »              ; returns 3
-     « nil or die error! »            ; dies because atom preceding `or` is NIL"
+     « nil or die error! »            ; dies because atom preceding `or` is NIL
+     « 3 or do (format t •no~%•)! »   ; returns 3
+     « nil or do (format t •no~%•) »  ; prints 'no'"
   (declare (ignore char))
   (let ((err-mess     "« reader macro not written to specification")
         (ender        "»")
@@ -430,13 +454,17 @@
          ((string= "DIE" (symbol-name theoperator))
            `(or-die (,after) ,before))
          ((string= "WARN" (symbol-name theoperator))
-           `(or-die (,after :errfun #'advise) ,before))))
+           `(or-die (,after :errfun #'advise) ,before))
+         ((string= "DO" (symbol-name theoperator))
+           `(or-do ,after ,before))))
       ((atom before)
        (cond
          ((string= "DIE" (symbol-name theoperator))
            `(if ,before ,before (die ,after)))
          ((string= "WARN" (symbol-name theoperator))
-           `(if ,before ,before (advise ,after))))))))
+           `(if ,before ,before (advise ,after)))
+         ((string= "DO" (symbol-name theoperator))
+           `(if ,before ,before ,after)))))))
 
 (set-macro-character #\« #'|«-reader|)
 
