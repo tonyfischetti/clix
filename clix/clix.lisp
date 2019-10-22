@@ -19,6 +19,7 @@
            :red               :yellow             :cyan
            :*clix-zsh*        :with-gensyms       :mac
            :nil!              :aif                :it!
+           :alambda           :self!
            :slurp             :barf               :get-size
            :die               :or-die             :or-do
            :die-if-null
@@ -34,7 +35,7 @@
            :index!            :value!             :key!
            :for-each-line     :for-each-list      :for-each-hash
            :for-each-vector   :for-each-stream    :for-each-alist
-           :for-each-yield    :for-each
+           :for-each-call     :for-each           :forever
            :eval-always       :abbr               :str-join
            :substr            :interpose          :print-hash-table
            :re-compile        :str-split          :str-replace
@@ -48,7 +49,8 @@
            :if-this->then
            :request           :xml-parse          :xml-parse-file
            :xpath             :xml-text
-           :alist->hash-table :hash-table->alist
+           :alist->hash-table :hash-table->alist  :string->octets
+           :octets->string    :make-octet-vector  :concat-octet-vector
            :r-get             :with-r))
 
 (in-package :clix)
@@ -116,6 +118,12 @@
   "Sets all the arguments to nil"
   (let ((tmp (mapcar (lambda (x) `(setf ,x nil)) rest)))
     `(progn ,@tmp)))
+
+; I forgot where I stole this from
+(defmacro alambda (params &body body)
+  "Anaphoric lambda. SELF! is the function"
+  `(labels ((self! ,params ,@body))
+     #'self!))
 
 ; ------------------------------------------------------- ;
 
@@ -696,7 +704,7 @@
 (defmacro for-each-yield ((fun astream) &body body)
   "this works like `for-each` (see documentation for it) but
    is not automatically dispatched by it so it needs to always
-   be called explicitly). It's first argument is a list of
+   be called explicitly). it's first argument is a list of
    (a) a function that gets repeatedly called each-loop until
    it returns nil, and
    (b) an argument to pass to the function (like a stream)
@@ -706,6 +714,24 @@
            (value!      nil))
        (block this-loop!
               (loop for value! = (,fun ,astream)
+                    while value!
+                    do (progn (incf index!)
+                              (block this-pass! ,@body)))))
+     (sb-sys:interactive-interrupt ()
+         (die "~%Loop aborted. Bailing out.~%"))))
+
+
+(defmacro for-each-call (aclosure &body body)
+  "This works like `for-each` (see documentation for it) but
+   due to differences, it is not automatically dispatched so
+   if always needs to be called explicitly). It's only
+   argument (besides the body) is a closure that is repeatedly
+   `FUNCALL`ed and terminates when the closure returns NIL"
+  `(handler-case
+     (let ((index!      0)
+           (value!      nil))
+       (block this-loop!
+              (loop for value! = (funcall ,aclosure)
                     while value!
                     do (progn (incf index!)
                               (block this-pass! ,@body)))))
@@ -749,6 +775,17 @@
               (vector         (for-each-vector    ,tmp      ,@body))
               (list           (for-each-list      ,tmp      ,@body))
               (stream         (for-each-stream    ,tmp      ,@body)))))))))
+
+
+(defmacro forever (&body body)
+  "Performed BODY forever. Must be terminated by
+   RETURN-FROM NIL, or, simple RETURN
+   Simple wrapper around `(loop (progn ,@body))`"
+  `(handler-case
+     (block nil (loop (progn ,@body)))
+     (sb-sys:interactive-interrupt ()
+        (die "~%Loop aborted. Bailing out.~%"))))
+
 
 ;---------------------------------------------------------;
 
@@ -876,7 +913,7 @@
   ; https://www.reddit.com/r/Common_Lisp/comments/d0agxj/question_about_macros_and_lexical_scoping/
   """
   (flet ((debug (this)
-      `(format t "~20S -> ~S~%" ',this ,this)))
+      `(format *error-output* "~20S -> ~S~%" ',this ,this)))
     `(progn ,@(mapcar #'debug therest))))
 
 
@@ -995,10 +1032,22 @@
 
 
 ; --------------------------------------------------------------- ;
-; other abbreviations
+; other abbreviations and shortcuts
 
 (abbr alist->hash-table alexandria:alist-hash-table)
 (abbr hash-table->alist alexandria:hash-table-alist)
+
+(defmacro octets->string (&rest everything)
+  `(sb-ext:octets-to-string ,@everything))
+
+(defmacro string->octets (&rest everything)
+  `(sb-ext:string-to-octets ,@everything))
+
+(defmacro make-octet-vector (n)
+  `(make-array ,n :element-type '(unsigned-byte 8)))
+
+(defmacro concat-octet-vector (&rest everything)
+  `(concatenate '(vector (unsigned-byte 8)) ,@everything))
 
 ; (abbr ds-bind destructuring-bind)
 ; (abbr mv-bind multiple-value-bind)
