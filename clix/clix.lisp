@@ -701,26 +701,6 @@
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
-(defmacro for-each-yield ((fun astream) &body body)
-  "this works like `for-each` (see documentation for it) but
-   is not automatically dispatched by it so it needs to always
-   be called explicitly). it's first argument is a list of
-   (a) a function that gets repeatedly called each-loop until
-   it returns nil, and
-   (b) an argument to pass to the function (like a stream)
-  (see documentation for `for-each`)"
-  `(handler-case
-     (let ((index!      0)
-           (value!      nil))
-       (block this-loop!
-              (loop for value! = (,fun ,astream)
-                    while value!
-                    do (progn (incf index!)
-                              (block this-pass! ,@body)))))
-     (sb-sys:interactive-interrupt ()
-         (die "~%Loop aborted. Bailing out.~%"))))
-
-
 (defmacro for-each-call (aclosure &body body)
   "This works like `for-each` (see documentation for it) but
    due to differences, it is not automatically dispatched so
