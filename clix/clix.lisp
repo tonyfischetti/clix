@@ -48,7 +48,7 @@
            :delim             :defparams          :if->then
            :if-this->then
            :request           :xml-parse          :xml-parse-file
-           :xpath             :xml-text
+           :xpath             :xpath-compile      :xml-text
            :alist->hash-table :hash-table->alist  :string->octets
            :octets->string    :make-octet-vector  :concat-octet-vector
            :r-get             :with-r))
@@ -1020,14 +1020,32 @@
 ; HTML/XML stuff
 (abbr request drakma:http-request)
 
+(defmacro request (&rest everything)
+  `(drakma:http-request ,@everything))
+
 (defun xml-parse (astring)
   (cxml:parse astring (cxml-dom:make-dom-builder)))
 
 (defun xml-parse-file (afile)
   (cxml:parse-file afile (cxml-dom:make-dom-builder)))
 
-(abbr xpath xpath:evaluate)
-(abbr xml-text xpath:string-value)
+(defun xpath (doc anxpath &key (all t) (compiled-p nil) (text nil))
+  (let ((result (if compiled-p
+                  (xpath:evaluate-compiled anxpath doc)
+                  (xpath:evaluate anxpath doc))))
+    (unless (xpath:node-set-empty-p result)
+      (if (and all text)
+        (mapcar (lambda (x) (xpath:string-value x)) (xpath:all-nodes result))
+        (if (and all (not text))
+          (xpath:all-nodes result)
+          (if (and (not all) text)
+            (xpath:string-value result)
+            result))))))
+
+(defmacro xpath-compile (&rest everything)
+  `(xpath:compile-xpath ,@everything))
+
+
 ; --------------------------------------------------------------- ;
 
 
