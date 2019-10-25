@@ -10,7 +10,8 @@
 
 (defpackage :clix
   (:use :common-lisp :sb-ext)
-  (:export :fn                :ft                 :*clix-output-stream*
+  (:export :fn                :ft                 :info
+           :*clix-output-stream*
            :*clix-log-level*  :*clix-curly-test*  :*clix-external-format*
            :*clix-log-file*
            :+red-bold+        :+green-bold+       :+yellow-bold+
@@ -48,7 +49,7 @@
            :delim             :defparams          :if->then
            :if-this->then
            :request           :xml-parse          :xml-parse-file
-           :xpath             :xpath-compile      :xml-text
+           :xpath             :xpath-compile      :use-xml-namespace
            :alist->hash-table :hash-table->alist  :string->octets
            :octets->string    :make-octet-vector  :concat-octet-vector
            :r-get             :with-r))
@@ -66,6 +67,12 @@
 
 (defmacro ft (&rest everything)
   `(format t ,@everything))
+
+(defmacro info (&rest everything)
+  `(format *error-output* (green ,@everything)))
+
+; (defmacro  (&rest everything)
+;   `(format *error-output* (green ,@everything)))
 
 ;---------------------------------------------------------;
 
@@ -591,9 +598,9 @@
 ;---------------------------------------------------------;
 ; for-each and friends
 (declaim (inline progress))
-(defun progress (index limit &key (interval 1) (where *standard-output*))
+(defun progress (index limit &key (interval 1) (where *error-output*))
   (when (= 0 (mod index interval))
-    (format where "~A of ~A..... [~$%]~%" index limit (* 100 (/ index limit)))))
+    (format where (yellow "~A of ~A..... [~$%]~%" index limit (* 100 (/ index limit))))))
 
 (defmacro break! ()
   "For use with `for-each`
@@ -1024,6 +1031,12 @@
 
 (defmacro xpath-compile (&rest everything)
   `(xpath:compile-xpath ,@everything))
+
+(defmacro use-xml-namespace (anns)
+  `(setq xpath::*dynamic-namespaces*
+         (cons
+           (cons nil ,anns)
+           xpath::*dynamic-namespaces*)))
 
 
 ; --------------------------------------------------------------- ;
