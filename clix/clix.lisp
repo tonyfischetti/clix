@@ -34,9 +34,9 @@
            :with-time         :time-for-humans    :time!
            :progress          :break!             :continue!
            :index!            :value!             :key!
-           :for-each-line     :for-each-list      :for-each-hash
-           :for-each-vector   :for-each-stream    :for-each-alist
-           :for-each-call     :for-each           :forever
+           :for-each/line     :for-each/list      :for-each/hash
+           :for-each/vector   :for-each/stream    :for-each/alist
+           :for-each/call     :for-each           :forever
            :eval-always       :abbr               :str-join
            :substr            :interpose          :print-hash-table
            :re-compile        :str-split          :str-replace
@@ -161,7 +161,7 @@
 (defun str-subset (anlist pattern)
   "Returns all elements that match pattern"
   (let ((ret nil))
-    (for-each-list anlist
+    (for-each/list anlist
       (when (str-detect value! pattern)
         (setq ret (append ret (list value!)))))
     ret))
@@ -612,7 +612,7 @@
    It's short for `(return-from this-pass!"
   `(return-from this-pass!))
 
-(defmacro for-each-line (a-thing &body body)
+(defmacro for-each/line (a-thing &body body)
   "(see documentation for `for-each`)"
   (let ((resolved-fn            (gensym))
         (instream               (gensym)))
@@ -629,7 +629,7 @@
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
-(defmacro for-each-list (a-thing &body body)
+(defmacro for-each/list (a-thing &body body)
   "(see documentation for `for-each`)"
   (let ((the-list         (gensym)))
     `(handler-case
@@ -644,7 +644,7 @@
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
-(defmacro for-each-hash (a-thing &body body)
+(defmacro for-each/hash (a-thing &body body)
   "(see documentation for `for-each`)"
   (let ((the-hash         (gensym)))
     `(handler-case
@@ -661,7 +661,7 @@
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
-(defmacro for-each-vector (a-thing &body body)
+(defmacro for-each/vector (a-thing &body body)
   "(see documentation for `for-each`)"
   (let ((the-vector       (gensym)))
     `(handler-case
@@ -676,7 +676,7 @@
 
 
 ; USE UNWIND-PROTECT?
-(defmacro for-each-stream (the-stream &body body)
+(defmacro for-each/stream (the-stream &body body)
   "(see documentation for `for-each`)"
   (let ((instream               (gensym)))
     `(handler-case
@@ -690,7 +690,7 @@
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
-(defmacro for-each-alist (aalist &body body)
+(defmacro for-each/alist (aalist &body body)
   "(see documentation for `for-each`)"
   (let ((tmp          (gensym))
         (resolved     (gensym)))
@@ -708,7 +708,7 @@
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
-(defmacro for-each-call (aclosure &body body)
+(defmacro for-each/call (aclosure &body body)
   "This works like `for-each` (see documentation for it) but
    due to differences, it is not automatically dispatched so
    if always needs to be called explicitly). It's only
@@ -746,22 +746,22 @@
   If it's a filename, the external format is *clix-external-format* (:UTF-8 by default)
   Oh, it'll die gracefully if Control-C is used during the loops execution.
   And, finally, for extra performance, you can call it's subordinate functions directly.
-  They are... for-each-line, for-each-list, for-each-hash, for-each-vector,
-  for-each-stream, and for-each-alist"
+  They are... for-each/line, for-each/list, for-each/hash, for-each/vector,
+  for-each/stream, and for-each/alist"
   (let ((tmp (gensym)))
     `(let ((,tmp      ,a-thing))
       (cond
         ((and (listp ,tmp) (listp (car ,tmp)) (not (alexandria:proper-list-p (car ,tmp))))
-                          (for-each-alist ,tmp ,@body))
+                          (for-each/alist ,tmp ,@body))
         ((and (stringp ,tmp) (cl-fad:file-exists-p ,tmp))
-                          (for-each-line ,tmp ,@body))
+                          (for-each/line ,tmp ,@body))
         (t
           (progn
             (etypecase ,tmp
-              (hash-table     (for-each-hash      ,tmp      ,@body))
-              (vector         (for-each-vector    ,tmp      ,@body))
-              (list           (for-each-list      ,tmp      ,@body))
-              (stream         (for-each-stream    ,tmp      ,@body)))))))))
+              (hash-table     (for-each/hash      ,tmp      ,@body))
+              (vector         (for-each/vector    ,tmp      ,@body))
+              (list           (for-each/list      ,tmp      ,@body))
+              (stream         (for-each/stream    ,tmp      ,@body)))))))))
 
 
 (defmacro forever (&body body)
