@@ -30,5 +30,5 @@
 
 ; (sb-int:set-floating-point-modes :traps nil)
 
-(setq *PRINT-READABLY* t)
+; (setq *PRINT-READABLY* t)
 
