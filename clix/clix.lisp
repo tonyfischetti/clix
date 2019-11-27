@@ -52,7 +52,6 @@
            :xpath             :xpath-compile      :use-xml-namespace
            :alist->hash-table :hash-table->alist  :string->octets
            :octets->string    :make-octet-vector  :concat-octet-vector
-           :decode-url        :encode-url
            :r-get             :with-r))
 
 (in-package :clix)
@@ -1060,9 +1059,6 @@
 
 (defmacro concat-octet-vector (&rest everything)
   `(concatenate '(vector (unsigned-byte 8)) ,@everything))
-
-(abbr decode-url quri:url-decode)
-(abbr encode-url quri:url-encode)
 
 ; (abbr ds-bind destructuring-bind)
 ; (abbr mv-bind multiple-value-bind)
