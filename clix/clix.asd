@@ -13,5 +13,6 @@
                :plump
                :lquery
                :quri
+               :html-entities
                :cl-json)
   :components ((:file "clix")))
