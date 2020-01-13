@@ -234,6 +234,7 @@
                           (echo nil)
                           (enc *clix-external-format*)
                           (in  t)
+                          (return-string t)
                           (split nil))
   "Runs command `acommand` through the ZSH shell specified by the global *clix-zsh*
    `dry-run` just prints the command (default nil)
@@ -241,6 +242,7 @@
    `echo` will print the command before running it
    `enc` takes a format (default is *clix-external-format* [which is :UTF-8 by default])
    `in` t is inherited STDIN. nil is /dev/null. (default t)
+   `return-string` t returns the output string. nil inherits stdout (default t)
    `split` will separate the stdout by newlines and return a list (default: nil)"
   (flet ((strip (astring)
     (if (string= "" astring)
@@ -249,7 +251,7 @@
     (when (or echo dry-run)
       (format t "$ ~A~%" acommand))
     (unless dry-run
-      (let* ((outs        (make-string-output-stream))
+      (let* ((outs        (if return-string (make-string-output-stream) t))
              (errs        (make-string-output-stream))
              (theprocess  (run-program *clix-zsh* `("-c" ,acommand)
                                        :input in
@@ -259,11 +261,12 @@
              (retcode     (process-exit-code theprocess)))
         (when (> retcode 0)
           (funcall err-fun retcode (strip (get-output-stream-string errs))))
-        (values (if split
-                  (~s (get-output-stream-string outs) "\\n")
-                  (strip (get-output-stream-string outs)))
-                (strip (get-output-stream-string errs))
-                retcode)))))
+        (when return-string
+          (values (if split
+                    (~s (get-output-stream-string outs) "\\n")
+                    (strip (get-output-stream-string outs)))
+                  (strip (get-output-stream-string errs))
+                  retcode))))))
 
 
 (defun get-size (afile &key (just-bytes nil))
