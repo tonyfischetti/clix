@@ -14,5 +14,6 @@
                :lquery
                :quri
                :html-entities
-               :cl-json)
+               :cl-json
+               :yason)
   :components ((:file "clix")))

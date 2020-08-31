@@ -50,7 +50,8 @@
            :if-this->then
            :request           :xml-parse          :xml-parse-file
            :xpath             :xpath-compile      :use-xml-namespace
-           :alist->hash-table :hash-table->alist  :string->octets
+           :alist->hash-table :hash-table->alist  :hash-keys
+           :string->octets
            :octets->string    :make-octet-vector  :concat-octet-vector
            :r-get             :with-r))
 
@@ -1050,6 +1051,7 @@
 
 (abbr alist->hash-table alexandria:alist-hash-table)
 (abbr hash-table->alist alexandria:hash-table-alist)
+(abbr hash-keys alexandria:hash-table-keys)
 
 (defmacro octets->string (&rest everything)
   `(sb-ext:octets-to-string ,@everything))
