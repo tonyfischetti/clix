@@ -41,17 +41,19 @@
            :substr            :interpose          :print-hash-table
            :re-compile        :str-split          :str-replace
            :str-replace-all   :str-detect         :str-subset
-           :str-scan-to-strings                   :~m
+           :str-scan-to-strings                   :str-trim
+           :~m
            :~r                :~ra                :~s
            :~f                :~c
            :debug-these       :with-a-file        :stream!
            :rnorm
            :delim             :defparams          :if->then
            :if-this->then
-           :request           :xml-parse          :xml-parse-file
+           :request           :parse-xml
            :xpath             :xpath-compile      :use-xml-namespace
+           :xpath-string
            :alist->hash-table :hash-table->alist  :hash-keys
-           :string->octets
+           parse-json         :export-json        :string->octets
            :octets->string    :make-octet-vector  :concat-octet-vector
            :r-get             :with-r))
 
@@ -71,9 +73,6 @@
 
 (defmacro info (&rest everything)
   `(format *error-output* (green ,@everything)))
-
-; (defmacro  (&rest everything)
-;   `(format *error-output* (green ,@everything)))
 
 ;---------------------------------------------------------;
 
@@ -105,6 +104,9 @@
 
 (defvar *unix-epoch-difference*
   (encode-universal-time 0 0 0 1 1 1970 0))
+
+(defvar *whitespaces* '(#\Space #\Newline #\Backspace #\Tab
+                        #\Linefeed #\Page #\Return #\Rubout))
 
 ;---------------------------------------------------------;
 
@@ -175,6 +177,9 @@
     ; (declaim (ignorable dontneed))
     (cl-ppcre:scan-to-strings pattern astr)
     need))
+
+(defun str-trim (astring)
+  (string-trim *whitespaces* astring))
 
 (defmacro ~m (&rest everything)
   "Alias to str-detect"
@@ -328,12 +333,10 @@
            (,theval ,aval))
        (setf (gethash ,thekey ,theht) ,theval))))
 
-
 (declaim (inline get-hash))
 (defun get-hash (ht key)
   "Get value at KEY in hash-table HT"
   (gethash key ht))
-
 
 (declaim (inline rem-hash))
 (defun rem-hash (ht key)
@@ -521,6 +524,9 @@
 
 (defmethod get-at ((this standard-object) that)
   (slot-value this that))
+
+(defmethod get-at ((this RUNE-DOM::DOCUMENT) that)
+  (xpath this that))
 
 (set-macro-character #\{ #'|{-reader|)
 
@@ -1014,11 +1020,8 @@
 (defmacro request (&rest everything)
   `(drakma:http-request ,@everything))
 
-(defun xml-parse (astring)
+(defun parse-xml (astring)
   (cxml:parse astring (cxml-dom:make-dom-builder)))
-
-(defun xml-parse-file (afile)
-  (cxml:parse-file afile (cxml-dom:make-dom-builder)))
 
 (defun xpath (doc anxpath &key (all t) (compiled-p nil) (text nil))
   (let ((result (if compiled-p
@@ -1042,6 +1045,7 @@
            (cons nil ,anns)
            xpath::*dynamic-namespaces*)))
 
+(abbr xpath-string xpath:string-value)
 
 ; --------------------------------------------------------------- ;
 
@@ -1052,6 +1056,8 @@
 (abbr alist->hash-table alexandria:alist-hash-table)
 (abbr hash-table->alist alexandria:hash-table-alist)
 (abbr hash-keys alexandria:hash-table-keys)
+(abbr parse-json yason:parse)
+(abbr export-json yason:encode)
 
 (defmacro octets->string (&rest everything)
   `(sb-ext:octets-to-string ,@everything))
