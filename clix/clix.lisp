@@ -13,7 +13,7 @@
   (:export :fn                :ft                 :info
            :*clix-output-stream*
            :*clix-log-level*  :*clix-curly-test*  :*clix-external-format*
-           :*clix-log-file*   :*whitespaces
+           :*clix-log-file*   :*whitespaces*
            :+red-bold+        :+green-bold+       :+yellow-bold+
            :+blue-bold+       :+magenta-bold+     :+cyan-bold+
            :+reset-terminal-color+                :green
