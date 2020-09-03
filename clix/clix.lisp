@@ -53,7 +53,7 @@
            :xpath             :xpath-compile      :use-xml-namespace
            :xpath-string
            :alist->hash-table :hash-table->alist  :hash-keys
-           parse-json         :export-json        :string->octets
+           :parse-json        :export-json        :string->octets
            :octets->string    :make-octet-vector  :concat-octet-vector
            :r-get             :with-r))
 
