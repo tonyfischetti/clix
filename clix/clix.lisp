@@ -46,15 +46,15 @@
            :~r                :~ra                :~s
            :~f                :~c
            :debug-these       :with-a-file        :stream!
-           :rnorm
-           :delim             :defparams          :if->then
-           :if-this->then
-           :request           :parse-xml
-           :xpath             :xpath-compile      :use-xml-namespace
+           :rnorm             :delim              :defparams
+           :if->then          :if-this->then      :request
+           :parse-xml         :xpath
+           :xpath-compile      :use-xml-namespace
            :xpath-string
            :alist->hash-table :hash-table->alist  :hash-keys
-           :parse-json        :export-json        :string->octets
-           :octets->string    :make-octet-vector  :concat-octet-vector
+           :parse-json        :export-json        :λ
+           :string->octets    :octets->string     :make-octet-vector
+           :concat-octet-vector
            :r-get             :with-r))
 
 (in-package :clix)
@@ -1059,6 +1059,10 @@
 (abbr parse-json yason:parse)
 (abbr export-json yason:encode)
 
+
+(defmacro λ (&body body)
+  `(lambda ,@body))
+
 (defmacro octets->string (&rest everything)
   `(sb-ext:octets-to-string ,@everything))
 
@@ -1078,7 +1082,6 @@
 ; (abbr set# sethash)
 ; (abbr getset# getsethash)
 ; (abbr rem# remhash)
-; (abbr λ lambda)
 
 ; --------------------------------------------------------------- ;
 
