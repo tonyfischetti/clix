@@ -501,10 +501,8 @@
           ((char= curr #\}) (push prev chars))
         (push prev chars))
       (setf inbetween (coerce (nreverse chars) 'string)))
-    (with-input-from-string (s inbetween)
-      (let* ((partone       (read s))
-             (parttwo       (read s)))
-        `(get-at ,partone ,parttwo)))))
+    (let ((leido (read-from-string (fn "(~A)" inbetween))))
+      `(clix-get ,@leido))))
 
 (defmethod get-at ((this list) that)
   (cond ((alistp this)        (cdr (assoc that this :test *clix-curly-test*)))
@@ -540,6 +538,18 @@
     ((typep this 'structure-object) (setf (slot-value this that) new))
     ((typep this 'standard-object)  (setf (slot-value this that) new))
     ))
+
+(defmacro suc-apply (afun &rest rest)
+  (let ((built      nil)
+        (thing      (car rest))
+        (thefirst   (cadr rest))
+        (therest    (cddr rest)))
+    (setq built (reduce (lambda (x y) `(,afun ,x ,y)) therest
+                        :initial-value `(,afun ,thing ,thefirst)))
+    built))
+
+(defmacro clix-get (x &rest rest)
+  `(suc-apply get-at ,x ,@rest))
 
 
 ; --------------------------------------------------------------- ;
