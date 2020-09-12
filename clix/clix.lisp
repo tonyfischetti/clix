@@ -55,6 +55,7 @@
            :parse-json        :export-json        :λ
            :string->octets    :octets->string     :make-octet-vector
            :concat-octet-vector
+           :parse-html        :$$
            :r-get             :with-r))
 
 (in-package :clix)
@@ -1084,6 +1085,9 @@
 
 (defmacro concat-octet-vector (&rest everything)
   `(concatenate '(vector (unsigned-byte 8)) ,@everything))
+
+(abbr parse-html plump:parse)
+(abbr $$ lquery:$)
 
 ; (abbr ds-bind destructuring-bind)
 ; (abbr mv-bind multiple-value-bind)
