@@ -10,6 +10,7 @@
 
 (defpackage :clix
   (:use :common-lisp :sb-ext)
+  (:import-from :parse-float :parse-float)
   (:export :fn                :ft                 :info
            :*clix-output-stream*
            :*clix-log-level*  :*clix-curly-test*  :*clix-external-format*
@@ -56,7 +57,7 @@
            :string->octets    :octets->string     :make-octet-vector
            :concat-octet-vector
            :parse-html        :$$
-           :r-get             :with-r))
+           :r-get             :with-r             :parse-float))
 
 (in-package :clix)
 
