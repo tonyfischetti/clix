@@ -49,11 +49,12 @@
            :debug-these       :with-a-file        :stream!
            :rnorm             :delim              :defparams
            :if->then          :if-this->then      :request
-           :parse-xml         :xpath
-           :xpath-compile      :use-xml-namespace
+           :parse-xml         :parse-xml-file     :xpath
+           :xpath-compile     :use-xml-namespace
            :xpath-string
            :alist->hash-table :hash-table->alist  :hash-keys
-           :parse-json        :export-json        :λ
+           :parse-json        :parse-json-file
+           :export-json        :λ
            :string->octets    :octets->string     :make-octet-vector
            :concat-octet-vector
            :parse-html        :$$
@@ -1035,6 +1036,9 @@
 (defun parse-xml (astring)
   (cxml:parse astring (cxml-dom:make-dom-builder)))
 
+(defun parse-xml-file (afile)
+  (cxml:parse-file afile (cxml-dom:make-dom-builder)))
+
 (defun xpath (doc anxpath &key (all t) (compiled-p nil) (text nil))
   (let ((result (if compiled-p
                   (xpath:evaluate-compiled anxpath doc)
@@ -1070,6 +1074,10 @@
 (abbr hash-keys alexandria:hash-table-keys)
 (abbr parse-json yason:parse)
 (abbr export-json yason:encode)
+
+(defun parse-json-file (afile)
+  (with-a-file afile :r
+    (yason:parse stream!)))
 
 
 (defmacro λ (&body body)
