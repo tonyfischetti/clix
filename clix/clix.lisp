@@ -21,8 +21,10 @@
            :red               :yellow             :cyan
            :*clix-zsh*        :with-gensyms       :mac
            :nil!              :aif                :it!
-           :alambda           :self!
-           :slurp             :barf               :get-size
+           :alambda           :self!              :get-size
+           :slurp             :barf               :round-to
+           :with-hash-entry   :if-hash-entry      :if-not-hash-entry
+           :entry!
            :die               :or-die             :or-do
            :die-if-null
            :advise            :error!
@@ -54,7 +56,7 @@
            :xpath-string
            :alist->hash-table :hash-table->alist  :hash-keys
            :parse-json        :parse-json-file
-           :export-json        :λ
+           :export-json       :λ
            :string->octets    :octets->string     :make-octet-vector
            :concat-octet-vector
            :parse-html        :$$
@@ -283,6 +285,45 @@
    `just-bytes` ensures that the size is only counted in bytes (returns integer) [default nil]"
   (let ((result   (~r (zsh (format nil "du ~A '~A'" (if just-bytes "-sb" "") afile)) "\\s+.*$" "")))
     (if just-bytes (parse-integer result) result)))
+
+
+(defun round-to (number precision &optional (what #'round))
+  "Round `number` to `precision` decimal places. Stolen from somewhere"
+  (let ((div (expt 10 precision)))
+    (float (/ (funcall what (* number div)) div))))
+
+
+(defmacro with-hash-entry ((ahash akey) &body body)
+  "Establishes a lexical environment for referring to the _value_ of
+   key `akey` on the hash table `ahash` using the anaphor `entry!`.
+   So, you can setf `entry!` and the hash-table (for that key) will
+   by modified."
+  (with-gensyms (thehash thekey)
+    `(let ((,thehash ,ahash)
+           (,thekey  ,akey))
+       (symbol-macrolet
+         ((entry! (gethash ,thekey ,thehash)))
+         ,@body))))
+
+(defmacro if-hash-entry ((ahash akey) then &optional else)
+  "Executes `then` if there's a key `akey` in hash-table `ahash` and
+   `else` (optional) if not. For convenience, an anaphor `entry!` is
+   introduced that is setf-able."
+  (with-gensyms (thehash thekey)
+    `(let ((,thehash ,ahash)
+           (,thekey  ,akey))
+       (with-hash-entry (,thehash ,thekey)
+         (if entry! ,then ,else)))))
+
+(defmacro if-not-hash-entry ((ahash akey) then &optional else)
+  "Executes `then` if there is _NOT_ key `akey` in hash-table `ahash` and
+   `else` (optional) if exists. For convenience, an anaphor `entry!` is
+   introduced that is setf-able."
+  (with-gensyms (thehash thekey)
+    `(let ((,thehash ,ahash)
+           (,thekey  ,akey))
+       (with-hash-entry (,thehash ,thekey)
+         (if (not entry!) ,then ,else)))))
 
 
 (defun die (message &key (status 1) (red-p t))
