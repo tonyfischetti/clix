@@ -24,19 +24,16 @@
            :alambda           :self!              :get-size
            :slurp             :barf               :round-to
            :with-hash-entry   :if-hash-entry      :if-not-hash-entry
-           :entry!
-           :die               :or-die             :or-do
-           :die-if-null
-           :advise            :error!
-           :set-hash          :get-hash           :rem-hash
-           :alistp            :set-alist          :get-alist
-           :rem-alist         :cmdargs            :clear-screen
-           :-<>               :<>                 :zsh
-           :universal->unix-time                  :unix->universal-time
-           :get-unix-time     :make-pretty-time   :get-current-time
-           :with-time         :time-for-humans    :time!
-           :progress          :break!             :continue!
-           :index!            :value!             :key!
+           :entry!            :die                :or-die
+           :or-do             :die-if-null        :advise
+           :error!            :alistp             :cmdargs 
+           :clear-screen      :-<>                :<> 
+           :zsh               :universal->unix-time
+           :unix->universal-time                  :get-unix-time
+           :make-pretty-time  :get-current-time   :with-time
+           :time-for-humans    :time!             :progress
+           :break!            :continue!          :index!
+           :value!            :key!
            :for-each/line     :for-each/list      :for-each/hash
            :for-each/vector   :for-each/stream    :for-each/alist
            :for-each/call     :for-each           :forever
@@ -45,22 +42,18 @@
            :re-compile        :str-split          :str-replace
            :str-replace-all   :str-detect         :str-subset
            :str-scan-to-strings                   :str-trim
-           :~m
-           :~r                :~ra                :~s
-           :~f                :~c
+           :~m                :~r                 :~ra
+           :~s                :~f                 :~c
            :debug-these       :with-a-file        :stream!
            :rnorm             :delim              :defparams
-           :if->then          :if-this->then      :request
-           :parse-xml         :parse-xml-file     :xpath
-           :xpath-compile     :use-xml-namespace
-           :xpath-string
-           :alist->hash-table :hash-table->alist  :hash-keys
-           :parse-json        :parse-json-file
-           :export-json       :λ
-           :string->octets    :octets->string     :make-octet-vector
-           :concat-octet-vector
-           :parse-html        :$$
-           :r-get             :with-r             :parse-float))
+           :request           :parse-xml          :parse-xml-file
+           :xpath             :xpath-compile      :use-xml-namespace
+           :xpath-string      :alist->hash-table  :hash-table->alist
+           :hash-keys         :parse-json         :parse-json-file
+           :export-json       :λ                  :string->octets
+           :octets->string    :make-octet-vector :concat-octet-vector
+           :parse-html        :$$                 :r-get
+           :with-r            :parse-float))
 
 (in-package :clix)
 
@@ -88,7 +81,7 @@
 (defparameter *clix-output-stream* *terminal-io*)
 (defparameter *clix-log-level* 2)
 (defparameter *clix-log-file* "clix-log.out")
-(defparameter *clix-curly-test* #'eq)
+(defparameter *clix-curly-test* #'equal)
 
 (defparameter *clix-external-format* :UTF-8)
 
@@ -142,6 +135,229 @@
 
 ; ------------------------------------------------------- ;
 
+(defun die (message &key (status 1) (red-p t))
+  "Prints MESSAGE to *ERROR-OUTPUT* and quits with a STATUS (default 1)"
+  (format *error-output* "~A~A~A~%" (if red-p +red-bold+ "")
+                                      (fn message)
+                                    (if red-p +reset-terminal-color+ ""))
+  #+clisp (ext:exit status)
+  #+sbcl  (sb-ext:quit :unix-status status))
+
+
+(defmacro or-die ((message &key (errfun #'die)) &body body)
+  "anaphoric macro that binds ERROR! to the error
+   It takes a MESSAGE with can include ERROR! (via
+   (format nil...) for example) It also takes ERRFUN
+   which it will FUNCALL with the MESSAGE. The default
+   is to DIE, but you can, for example, PRINC instead"
+  `(handler-case
+     (progn
+       ,@body)
+     (error (error!)
+       (funcall ,errfun (format nil "~A" ,message)))))
+
+
+(defmacro or-do (orthis &body body)
+  "anaphoric macro that binds ERROR! to the error.
+   If the body fails, the form ORTHIS gets run."
+  `(handler-case
+     (progn
+       ,@body)
+      (error (error!)
+        ,orthis)))
+
+(defmacro die-if-null (avar &rest therest)
+  "Macro to check if any of the supplied arguments are null"
+  (let ((whole (cons avar therest)))
+    `(loop for i in ',whole
+           do (unless (eval i) (die (format nil "Fatal error: ~A is null" i))))))
+
+
+
+;---------------------------------------------------------;
+; for-each and friends
+(declaim (inline progress))
+(defun progress (index limit &key (interval 1) (where *error-output*))
+  (when (= 0 (mod index interval))
+    (format where (yellow "~A of ~A..... [~$%]~%" index limit (* 100 (/ index limit))))))
+
+(defmacro break! ()
+  "For use with `for-each`
+   It's short for `(return-from this-loop!"
+  `(return-from this-loop!))
+
+(defmacro continue! ()
+  "For use with `for-each`
+   It's short for `(return-from this-pass!"
+  `(return-from this-pass!))
+
+(defmacro for-each/line (a-thing &body body)
+  "(see documentation for `for-each`)"
+  (let ((resolved-fn            (gensym))
+        (instream               (gensym)))
+    `(handler-case
+       (let ((index!            0)
+             (value!            nil)
+             (,resolved-fn      ,a-thing))
+         (with-open-file (,instream ,resolved-fn :if-does-not-exist :error
+                                    :external-format *clix-external-format*)
+           (block this-loop!
+              (loop for value! = (read-line ,instream nil)
+                    while value! do (progn (incf index!) (block this-pass! ,@body))))))
+       (sb-sys:interactive-interrupt ()
+         (die "~%Loop aborted. Bailing out.~%")))))
+
+
+(defmacro for-each/list (a-thing &body body)
+  "(see documentation for `for-each`)"
+  (let ((the-list         (gensym)))
+    `(handler-case
+      (let ((index!       0)
+             (value!      nil)
+             (,the-list   ,a-thing))
+         (declare (ignorable value!))
+         (block this-loop!
+                (dolist (value! ,the-list)
+                  (incf index!)
+                  (block this-pass! ,@body))))
+       (sb-sys:interactive-interrupt ()
+         (die "~%Loop aborted. Bailing out.~%")))))
+
+
+(defmacro for-each/hash (a-thing &body body)
+  "(see documentation for `for-each`)"
+  (let ((the-hash         (gensym)))
+    `(handler-case
+       (let ((index!      0)
+             (key!        nil)
+             (value!      nil)
+             (,the-hash   ,a-thing))
+         (block this-loop!
+                (loop for key! being the hash-keys of ,the-hash
+                      do (progn (incf index!)
+                                (setq value! (gethash key! ,the-hash))
+                                (block this-pass! ,@body)))))
+       (sb-sys:interactive-interrupt ()
+         (die "~%Loop aborted. Bailing out.~%")))))
+
+
+(defmacro for-each/vector (a-thing &body body)
+  "(see documentation for `for-each`)"
+  (let ((the-vector       (gensym)))
+    `(handler-case
+      (let ((index!       0)
+             (value!      nil)
+             (,the-vector ,a-thing))
+         (block this-loop!
+                (loop for value! across ,the-vector
+                      do (progn (incf index!) (block this-pass! ,@body)))))
+       (sb-sys:interactive-interrupt ()
+         (die "~%Loop aborted. Bailing out.~%")))))
+
+
+; USE UNWIND-PROTECT?
+(defmacro for-each/stream (the-stream &body body)
+  "(see documentation for `for-each`)"
+  (let ((instream               (gensym)))
+    `(handler-case
+       (let ((index!            0)
+             (value!            nil)
+             (,instream         ,the-stream))
+           (block this-loop!
+              (loop for value! = (read-line ,instream nil)
+                    while value! do (progn (incf index!) (block this-pass! ,@body)))))
+       (sb-sys:interactive-interrupt ()
+         (die "~%Loop aborted. Bailing out.~%")))))
+
+
+(defmacro for-each/alist (aalist &body body)
+  "(see documentation for `for-each`)"
+  (let ((tmp          (gensym))
+        (resolved     (gensym)))
+    `(handler-case
+      (let ((index!          0)
+            (,resolved       ,aalist))
+         (block this-loop!
+                (loop for ,tmp in ,resolved
+                      do (progn
+                           (incf index!)
+                           (setq key! (car ,tmp))
+                           (setq value! (cdr ,tmp))
+                           (block this-pass! ,@body)))))
+       (sb-sys:interactive-interrupt ()
+         (die "~%Loop aborted. Bailing out.~%")))))
+
+
+(defmacro for-each/call (aclosure &body body)
+  "This works like `for-each` (see documentation for it) but
+   due to differences, it is not automatically dispatched so
+   if always needs to be called explicitly). It's only
+   argument (besides the body) is a closure that is repeatedly
+   `FUNCALL`ed and terminates when the closure returns NIL"
+  `(handler-case
+     (let ((index!      0)
+           (value!      nil))
+       (block this-loop!
+              (loop for value! = (funcall ,aclosure)
+                    while value!
+                    do (progn (incf index!)
+                              (block this-pass! ,@body)))))
+     (sb-sys:interactive-interrupt ()
+         (die "~%Loop aborted. Bailing out.~%"))))
+
+
+(defmacro for-each (a-thing &body body)
+  "A super-duper imperative looping construct.
+   It takes either
+     a filename string    (to be treated as a file and goes line by line)
+     a hash-table
+     a vector
+     a list
+     a string             (that goes character by character)
+     or a stream          (that goes line by line)
+  It is anaphoric and introduces
+     `index!`             (which is a zero indexed counter of which element we are on)
+     `key!`               (the key of the current hash-table entry [only for hash-tables and alists])
+     `value!`             (the value of the current element)
+     `this-pass!`         (a block that returning from immediately moves to the next iteration)
+     `this-loop!`         (a block that returning from exits the loop)
+  For convenience, `(continue!)` and `(break!)` will execute `(return-from this-pass!)`
+  and `(return-from this-loop!)`, respectively
+  If it's a filename, the external format is *clix-external-format* (:UTF-8 by default)
+  Oh, it'll die gracefully if Control-C is used during the loops execution.
+  And, finally, for extra performance, you can call it's subordinate functions directly.
+  They are... for-each/line, for-each/list, for-each/hash, for-each/vector,
+  for-each/stream, and for-each/alist"
+  (let ((tmp (gensym)))
+    `(let ((,tmp      ,a-thing))
+      (cond
+        ((and (listp ,tmp) (listp (car ,tmp)) (not (alexandria:proper-list-p (car ,tmp))))
+                          (for-each/alist ,tmp ,@body))
+        ((and (stringp ,tmp) (cl-fad:file-exists-p ,tmp))
+                          (for-each/line ,tmp ,@body))
+        (t
+          (progn
+            (etypecase ,tmp
+              (hash-table     (for-each/hash      ,tmp      ,@body))
+              (vector         (for-each/vector    ,tmp      ,@body))
+              (list           (for-each/list      ,tmp      ,@body))
+              (stream         (for-each/stream    ,tmp      ,@body)))))))))
+
+
+(defmacro forever (&body body)
+  "Performed BODY forever. Must be terminated by
+   RETURN-FROM NIL, or, simple RETURN
+   Simple wrapper around `(loop (progn ,@body))`"
+  `(handler-case
+     (block nil (loop (progn ,@body)))
+     (sb-sys:interactive-interrupt ()
+        (die "~%Loop aborted. Bailing out.~%"))))
+
+
+;---------------------------------------------------------;
+
+
+
 ; --------------------------------------------------------------- ;
 ; cl-ppcre wrappers where the arguments are re-arranged to make sense to me
 
@@ -165,7 +381,7 @@
    Wrapper around cl-ppcre:scan"
   `(if (cl-ppcre:scan ,pattern ,astr ,@everything) t nil))
 
-(declaim (inline str-subset))
+; RIPE FOR RE-WRITING
 (defun str-subset (anlist pattern)
   "Returns all elements that match pattern"
   (let ((ret nil))
@@ -174,12 +390,10 @@
         (setq ret (append ret (list value!)))))
     ret))
 
-(declaim (inline str-scan-to-strings))
 (defun str-scan-to-strings (astr pattern)
   "Wrapper around cl-ppcre:scan-to-strings with string first
    and only returns the important part (the vector of matches)"
   (multiple-value-bind (dontneed need)
-    ; (declaim (ignorable dontneed))
     (cl-ppcre:scan-to-strings pattern astr)
     need))
 
@@ -222,6 +436,8 @@
   `(let ((it! ,test))
      (if it! ,then ,else)))
 
+
+; IS IT MAYBE BIGGER THAN IT NEEDS TO BE BECAUSE MULTIBYTE?
 (defun slurp (path)
   "Reads file at PATH into a single string"
   (with-open-file (stream path :if-does-not-exist :error)
@@ -315,6 +531,7 @@
        (with-hash-entry (,thehash ,thekey)
          (if entry! ,then ,else)))))
 
+; GOTTA BE A BETTER WAY!
 (defmacro if-not-hash-entry ((ahash akey) then &optional else)
   "Executes `then` if there is _NOT_ key `akey` in hash-table `ahash` and
    `else` (optional) if exists. For convenience, an anaphor `entry!` is
@@ -326,43 +543,6 @@
          (if (not entry!) ,then ,else)))))
 
 
-(defun die (message &key (status 1) (red-p t))
-  "Prints MESSAGE to *ERROR-OUTPUT* and quits with a STATUS (default 1)"
-  (format *error-output* "~A~A~A~%" (if red-p +red-bold+ "")
-                                      (fn message)
-                                    (if red-p +reset-terminal-color+ ""))
-  #+clisp (ext:exit status)
-  #+sbcl  (sb-ext:quit :unix-status status))
-
-
-(defmacro or-die ((message &key (errfun #'die)) &body body)
-  "anaphoric macro that binds ERROR! to the error
-   It takes a MESSAGE with can include ERROR! (via
-   (format nil...) for example) It also takes ERRFUN
-   which it will FUNCALL with the MESSAGE. The default
-   is to DIE, but you can, for example, PRINC instead"
-  `(handler-case
-     (progn
-       ,@body)
-     (error (error!)
-       (funcall ,errfun (format nil "~A" ,message)))))
-
-
-(defmacro or-do (orthis &body body)
-  "anaphoric macro that binds ERROR! to the error.
-   If the body fails, the form ORTHIS gets run."
-  `(handler-case
-     (progn
-       ,@body)
-      (error (error!)
-        ,orthis)))
-
-(defmacro die-if-null (avar &rest therest)
-  "Macro to check if any of the supplied arguments are null"
-  (let ((whole (cons avar therest)))
-    `(loop for i in ',whole
-           do (unless (eval i) (die (format nil "Fatal error: ~A is null" i))))))
-
 (defun advise (message &key (yellow-p t))
   "Prints MESSAGE to *ERROR-OUTPUT* but resumes
    (for use with OR-DIE's ERRFUN)"
@@ -370,44 +550,11 @@
                                      message
                                      (if yellow-p +reset-terminal-color+ "")))
 
-(defmacro set-hash (aht akey aval)
-  (with-gensyms (theht thekey theval)
-    `(let ((,theht  ,aht)
-           (,thekey ,akey)
-           (,theval ,aval))
-       (setf (gethash ,thekey ,theht) ,theval))))
-
-(declaim (inline get-hash))
-(defun get-hash (ht key)
-  "Get value at KEY in hash-table HT"
-  (gethash key ht))
-
-(declaim (inline rem-hash))
-(defun rem-hash (ht key)
-  "Remove KEY in hash-table HT"
-  (remhash key ht))
 
 (defun alistp (something)
   "Test is something is an alist"
   (and (listp something)
        (every #'consp something)))
-
-(defmacro set-alist (aalist key value &key (test #'eq))
-  "Adds `key` and `value` to an alist `aalist`
-  (must be a macro in order to modify the alist in place)"
-  `(if (null (assoc ,key ,aalist :test ,test))
-    (push (cons ,key ,value) ,aalist)
-    (setf (cdr (assoc ,key ,aalist :test ,test)) ,value)))
-
-(declaim (inline get-alist))
-(defun get-alist (aalist key &key (test #'eq))
-  "Returns value of `key` of `aalist`"
-  (cdr (assoc key aalist :test test)))
-
-(defmacro rem-alist (aalist key)
-  "Destructively deletes `key`/value pair from `aalist`
-   (must be a macro in order to modify the alist in place)"
-  `(setq ,aalist (remove-if (lambda (x) (eq (car x) ,key)) ,aalist)))
 
 
 (defun cmdargs ()
@@ -441,6 +588,162 @@
 
 
 ; ------------------------------------------------------- ;
+
+
+;---------------------------------------------------------;
+; Stolen or inspired by https://github.com/vseloved/rutils/
+(define-condition rutils-style-warning (simple-condition style-warning) ())
+
+(defmacro eval-always (&body body)
+  "Wrap BODY in eval-when with all keys (compile, load and execute) mentioned."
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     ,@body))
+
+(defmacro abbr (short long &optional lambda-list)
+  "Abbreviate LONG macro or function name as SHORT.
+   If LAMBDA-LIST is present, also copy appropriate SETF-expander."
+  `(eval-always
+     ;; Lispworks signals error while abbreviating to keywords
+     ;; SBCL has package locks when accessing built-in functionality
+     ;; other similar things are probably possible in other implementations
+     (handler-bind ((error (lambda (e)
+                             (let ((r (find-restart 'continue e)))
+                               (when r
+                                 (warn 'rutils-style-warning
+                                       :format-control
+                                       "Skipped error during abbreviation: ~A"
+                                       :format-arguments (list e))
+                                 (invoke-restart r))))))
+       (cond
+         ((macro-function ',long)
+          (setf (macro-function ',short) (macro-function ',long))
+          #+ccl (setf (ccl:arglist ',short) (ccl:arglist ',long)))
+         ((special-operator-p ',long)
+          (error "Can't abbreviate a special-operator ~a" ',long))
+         ((fboundp ',long)
+          (setf (fdefinition ',short) (fdefinition ',long))
+          #+ccl (setf (ccl:arglist ',short) (ccl:arglist ',long))
+          ,(when lambda-list
+            `(define-setf-expander ,short ,lambda-list
+               (values ,@(multiple-value-bind
+                          (dummies vals store store-form access-form)
+                          (get-setf-expansion
+                           (cons long (remove-if (lambda (sym)
+                                                   (member sym '(&optional &key)))
+                                                 lambda-list)))
+                          (let ((expansion-vals (mapcar (lambda (x) `(quote ,x))
+                                                        (list dummies
+                                                              vals
+                                                              store
+                                                              store-form
+                                                              access-form))))
+                            (setf (second expansion-vals)
+                                  (cons 'list vals))
+                            expansion-vals))))))
+         (t
+          (error "Can't abbreviate ~a" ',long)))
+       (setf (documentation ',short 'function) (documentation ',long 'function))
+',short)))
+
+
+(defun str-join (delim strings)
+  "Join STRINGS with DELIM."
+  (format nil (format nil "~~{~~A~~^~A~~}" delim) strings))
+
+(defun substr (string start &optional end)
+  "Efficient substring of STRING from START to END (optional),
+  where both can be negative, which means counting from the end."
+  (let ((len (length string)))
+    (subseq string
+            (if (minusp start) (+ len start) start)
+            (if (and end (minusp end)) (+ len end) end))))
+
+
+(defun interpose (separator list)
+  "Returns a sequence of the elements of SEQUENCE separated by SEPARATOR."
+  (labels ((rec (s acc)
+                (if s
+                  (rec (cdr s) (nconc acc
+                                      (list separator (car s))))
+                  acc)))
+    (cdr (rec list nil))))
+
+
+(defun print-hash-table (ht &optional (stream *standard-output*))
+  "Pretty print hash-table HT to STREAM."
+  (let ((*print-pretty*	t)
+        (i              0))
+    (pprint-logical-block (stream nil)
+                          (pprint-newline :fill stream)
+                          (princ "#{" stream)
+                          (unless (eq (hash-table-test ht) 'eql)
+                            (princ (hash-table-test ht) stream))
+                          (pprint-indent :block 2 stream)
+                          (block nil
+                                 (maphash (lambda (k v)
+                                            (pprint-newline :mandatory stream)
+                                            (when (and *print-length* (> (incf i) *print-length*))
+                                              (princ "..." stream)
+                                              (return))
+                                            (when (and k (listp k)) (princ #\' stream))
+                                            (if (typep k 'hash-table)
+                                              (print-hash-table k stream)
+                                              (prin1 k stream))
+                                            (princ " " stream)
+                                            (when (and v (listp v)) (princ #\' stream))
+                                            (if (typep v 'hash-table)
+                                              (print-hash-table v stream)
+                                              (prin1 v stream)))
+                                          ht))
+                          (pprint-indent :block 1 stream)
+                          (pprint-newline :mandatory stream)
+                          (princ "} " stream)))
+  ht)
+
+; --------------------------------------------------------------- ;
+
+
+
+
+
+; --------------------------------------------------------------- ;
+; HTML/XML stuff
+
+(defmacro request (&rest everything)
+  `(drakma:http-request ,@everything))
+
+(defun parse-xml (astring)
+  (cxml:parse astring (cxml-dom:make-dom-builder)))
+
+(defun parse-xml-file (afile)
+  (cxml:parse-file afile (cxml-dom:make-dom-builder)))
+
+(defun xpath (doc anxpath &key (all t) (compiled-p nil) (text nil))
+  (let ((result (if compiled-p
+                  (xpath:evaluate-compiled anxpath doc)
+                  (xpath:evaluate anxpath doc))))
+    (unless (xpath:node-set-empty-p result)
+      (if (and all text)
+        (mapcar (lambda (x) (xpath:string-value x)) (xpath:all-nodes result))
+        (if (and all (not text))
+          (xpath:all-nodes result)
+          (if (and (not all) text)
+            (xpath:string-value result)
+            result))))))
+
+(defmacro xpath-compile (&rest everything)
+  `(xpath:compile-xpath ,@everything))
+
+(defmacro use-xml-namespace (anns)
+  `(setq xpath::*dynamic-namespaces*
+         (cons
+           (cons nil ,anns)
+           xpath::*dynamic-namespaces*)))
+
+(abbr xpath-string xpath:string-value)
+
+; --------------------------------------------------------------- ;
+
 
 
 ; ------------------------------------------------------- ;
@@ -659,298 +962,6 @@
 ;---------------------------------------------------------;
 
 
-;---------------------------------------------------------;
-; for-each and friends
-(declaim (inline progress))
-(defun progress (index limit &key (interval 1) (where *error-output*))
-  (when (= 0 (mod index interval))
-    (format where (yellow "~A of ~A..... [~$%]~%" index limit (* 100 (/ index limit))))))
-
-(defmacro break! ()
-  "For use with `for-each`
-   It's short for `(return-from this-loop!"
-  `(return-from this-loop!))
-
-(defmacro continue! ()
-  "For use with `for-each`
-   It's short for `(return-from this-pass!"
-  `(return-from this-pass!))
-
-(defmacro for-each/line (a-thing &body body)
-  "(see documentation for `for-each`)"
-  (let ((resolved-fn            (gensym))
-        (instream               (gensym)))
-    `(handler-case
-       (let ((index!            0)
-             (value!            nil)
-             (,resolved-fn      ,a-thing))
-         (with-open-file (,instream ,resolved-fn :if-does-not-exist :error
-                                    :external-format *clix-external-format*)
-           (block this-loop!
-              (loop for value! = (read-line ,instream nil)
-                    while value! do (progn (incf index!) (block this-pass! ,@body))))))
-       (sb-sys:interactive-interrupt ()
-         (die "~%Loop aborted. Bailing out.~%")))))
-
-
-(defmacro for-each/list (a-thing &body body)
-  "(see documentation for `for-each`)"
-  (let ((the-list         (gensym)))
-    `(handler-case
-      (let ((index!       0)
-             (value!      nil)
-             (,the-list   ,a-thing))
-         (block this-loop!
-                (dolist (value! ,the-list)
-                  (incf index!)
-                  (block this-pass! ,@body))))
-       (sb-sys:interactive-interrupt ()
-         (die "~%Loop aborted. Bailing out.~%")))))
-
-
-(defmacro for-each/hash (a-thing &body body)
-  "(see documentation for `for-each`)"
-  (let ((the-hash         (gensym)))
-    `(handler-case
-       (let ((index!      0)
-             (key!        nil)
-             (value!      nil)
-             (,the-hash   ,a-thing))
-         (block this-loop!
-                (loop for key! being the hash-keys of ,the-hash
-                      do (progn (incf index!)
-                                (setq value! (gethash key! ,the-hash))
-                                (block this-pass! ,@body)))))
-       (sb-sys:interactive-interrupt ()
-         (die "~%Loop aborted. Bailing out.~%")))))
-
-
-(defmacro for-each/vector (a-thing &body body)
-  "(see documentation for `for-each`)"
-  (let ((the-vector       (gensym)))
-    `(handler-case
-      (let ((index!       0)
-             (value!      nil)
-             (,the-vector ,a-thing))
-         (block this-loop!
-                (loop for value! across ,the-vector
-                      do (progn (incf index!) (block this-pass! ,@body)))))
-       (sb-sys:interactive-interrupt ()
-         (die "~%Loop aborted. Bailing out.~%")))))
-
-
-; USE UNWIND-PROTECT?
-(defmacro for-each/stream (the-stream &body body)
-  "(see documentation for `for-each`)"
-  (let ((instream               (gensym)))
-    `(handler-case
-       (let ((index!            0)
-             (value!            nil)
-             (,instream         ,the-stream))
-           (block this-loop!
-              (loop for value! = (read-line ,instream nil)
-                    while value! do (progn (incf index!) (block this-pass! ,@body)))))
-       (sb-sys:interactive-interrupt ()
-         (die "~%Loop aborted. Bailing out.~%")))))
-
-
-(defmacro for-each/alist (aalist &body body)
-  "(see documentation for `for-each`)"
-  (let ((tmp          (gensym))
-        (resolved     (gensym)))
-    `(handler-case
-      (let ((index!          0)
-            (,resolved       ,aalist))
-         (block this-loop!
-                (loop for ,tmp in ,resolved
-                      do (progn
-                           (incf index!)
-                           (setq key! (car ,tmp))
-                           (setq value! (cdr ,tmp))
-                           (block this-pass! ,@body)))))
-       (sb-sys:interactive-interrupt ()
-         (die "~%Loop aborted. Bailing out.~%")))))
-
-
-(defmacro for-each/call (aclosure &body body)
-  "This works like `for-each` (see documentation for it) but
-   due to differences, it is not automatically dispatched so
-   if always needs to be called explicitly). It's only
-   argument (besides the body) is a closure that is repeatedly
-   `FUNCALL`ed and terminates when the closure returns NIL"
-  `(handler-case
-     (let ((index!      0)
-           (value!      nil))
-       (block this-loop!
-              (loop for value! = (funcall ,aclosure)
-                    while value!
-                    do (progn (incf index!)
-                              (block this-pass! ,@body)))))
-     (sb-sys:interactive-interrupt ()
-         (die "~%Loop aborted. Bailing out.~%"))))
-
-
-(defmacro for-each (a-thing &body body)
-  "A super-duper imperative looping construct.
-   It takes either
-     a filename string    (to be treated as a file and goes line by line)
-     a hash-table
-     a vector
-     a list
-     a string             (that goes character by character)
-     or a stream          (that goes line by line)
-  It is anaphoric and introduces
-     `index!`             (which is a zero indexed counter of which element we are on)
-     `key!`               (the key of the current hash-table entry [only for hash-tables and alists])
-     `value!`             (the value of the current element)
-     `this-pass!`         (a block that returning from immediately moves to the next iteration)
-     `this-loop!`         (a block that returning from exits the loop)
-  For convenience, `(continue!)` and `(break!)` will execute `(return-from this-pass!)`
-  and `(return-from this-loop!)`, respectively
-  If it's a filename, the external format is *clix-external-format* (:UTF-8 by default)
-  Oh, it'll die gracefully if Control-C is used during the loops execution.
-  And, finally, for extra performance, you can call it's subordinate functions directly.
-  They are... for-each/line, for-each/list, for-each/hash, for-each/vector,
-  for-each/stream, and for-each/alist"
-  (let ((tmp (gensym)))
-    `(let ((,tmp      ,a-thing))
-      (cond
-        ((and (listp ,tmp) (listp (car ,tmp)) (not (alexandria:proper-list-p (car ,tmp))))
-                          (for-each/alist ,tmp ,@body))
-        ((and (stringp ,tmp) (cl-fad:file-exists-p ,tmp))
-                          (for-each/line ,tmp ,@body))
-        (t
-          (progn
-            (etypecase ,tmp
-              (hash-table     (for-each/hash      ,tmp      ,@body))
-              (vector         (for-each/vector    ,tmp      ,@body))
-              (list           (for-each/list      ,tmp      ,@body))
-              (stream         (for-each/stream    ,tmp      ,@body)))))))))
-
-
-(defmacro forever (&body body)
-  "Performed BODY forever. Must be terminated by
-   RETURN-FROM NIL, or, simple RETURN
-   Simple wrapper around `(loop (progn ,@body))`"
-  `(handler-case
-     (block nil (loop (progn ,@body)))
-     (sb-sys:interactive-interrupt ()
-        (die "~%Loop aborted. Bailing out.~%"))))
-
-
-;---------------------------------------------------------;
-
-
-;---------------------------------------------------------;
-; Stolen or inspired by https://github.com/vseloved/rutils/
-(define-condition rutils-style-warning (simple-condition style-warning) ())
-
-(defmacro eval-always (&body body)
-  "Wrap BODY in eval-when with all keys (compile, load and execute) mentioned."
-  `(eval-when (:compile-toplevel :load-toplevel :execute)
-     ,@body))
-
-(defmacro abbr (short long &optional lambda-list)
-  "Abbreviate LONG macro or function name as SHORT.
-   If LAMBDA-LIST is present, also copy appropriate SETF-expander."
-  `(eval-always
-     ;; Lispworks signals error while abbreviating to keywords
-     ;; SBCL has package locks when accessing built-in functionality
-     ;; other similar things are probably possible in other implementations
-     (handler-bind ((error (lambda (e)
-                             (let ((r (find-restart 'continue e)))
-                               (when r
-                                 (warn 'rutils-style-warning
-                                       :format-control
-                                       "Skipped error during abbreviation: ~A"
-                                       :format-arguments (list e))
-                                 (invoke-restart r))))))
-       (cond
-         ((macro-function ',long)
-          (setf (macro-function ',short) (macro-function ',long))
-          #+ccl (setf (ccl:arglist ',short) (ccl:arglist ',long)))
-         ((special-operator-p ',long)
-          (error "Can't abbreviate a special-operator ~a" ',long))
-         ((fboundp ',long)
-          (setf (fdefinition ',short) (fdefinition ',long))
-          #+ccl (setf (ccl:arglist ',short) (ccl:arglist ',long))
-          ,(when lambda-list
-            `(define-setf-expander ,short ,lambda-list
-               (values ,@(multiple-value-bind
-                          (dummies vals store store-form access-form)
-                          (get-setf-expansion
-                           (cons long (remove-if (lambda (sym)
-                                                   (member sym '(&optional &key)))
-                                                 lambda-list)))
-                          (let ((expansion-vals (mapcar (lambda (x) `(quote ,x))
-                                                        (list dummies
-                                                              vals
-                                                              store
-                                                              store-form
-                                                              access-form))))
-                            (setf (second expansion-vals)
-                                  (cons 'list vals))
-                            expansion-vals))))))
-         (t
-          (error "Can't abbreviate ~a" ',long)))
-       (setf (documentation ',short 'function) (documentation ',long 'function))
-',short)))
-
-
-(defun str-join (delim strings)
-  "Join STRINGS with DELIM."
-  (format nil (format nil "~~{~~A~~^~A~~}" delim) strings))
-
-(defun substr (string start &optional end)
-  "Efficient substring of STRING from START to END (optional),
-  where both can be negative, which means counting from the end."
-  (let ((len (length string)))
-    (subseq string
-            (if (minusp start) (+ len start) start)
-            (if (and end (minusp end)) (+ len end) end))))
-
-
-(defun interpose (separator list)
-  "Returns a sequence of the elements of SEQUENCE separated by SEPARATOR."
-  (labels ((rec (s acc)
-                (if s
-                  (rec (cdr s) (nconc acc
-                                      (list separator (car s))))
-                  acc)))
-    (cdr (rec list nil))))
-
-
-(defun print-hash-table (ht &optional (stream *standard-output*))
-  "Pretty print hash-table HT to STREAM."
-  (let ((*print-pretty* t) (i 0))
-    (pprint-logical-block (stream nil)
-                          (pprint-newline :fill stream)
-                          (princ "#{" stream)
-                          (unless (eq (hash-table-test ht) 'eql)
-                            (princ (hash-table-test ht) stream))
-                          (pprint-indent :block 2 stream)
-                          (block nil
-                                 (maphash (lambda (k v)
-                                            (pprint-newline :mandatory stream)
-                                            (when (and *print-length* (> (incf i) *print-length*))
-                                              (princ "..." stream)
-                                              (return))
-                                            (when (and k (listp k)) (princ #\' stream))
-                                            (if (typep k 'hash-table)
-                                              (print-hash-table k stream)
-                                              (prin1 k stream))
-                                            (princ " " stream)
-                                            (when (and v (listp v)) (princ #\' stream))
-                                            (if (typep v 'hash-table)
-                                              (print-hash-table v stream)
-                                              (prin1 v stream)))
-                                          ht))
-                          (pprint-indent :block 1 stream)
-                          (pprint-newline :mandatory stream)
-                          (princ "} " stream)))
-  ht)
-
-; --------------------------------------------------------------- ;
 
 
 
@@ -1026,85 +1037,9 @@
     (let ((tmp (helper body)))
      `(progn  ,@tmp))))
 
-
-; ????
-(defmacro if->then (&body body)
-  "Example:
-    (if->then
-      (string= *character* •cosmo•)    ->    •kramer•
-      (string= *character* •jerry•)    ->    •seinfeld•
-      (string= *character* •elaine•)   ->    •benes•
-      (string= *character* •george•)   ->    •costanza•)"
-  (labels ((group-them (alist)
-    (unless (null alist)
-      (cons `(,(car alist) ,(caddr alist))
-            (group-them (cdddr alist))))))
-  (let ((in-3s (group-them body)))
-    `(cond ,@(group-them body)))))
-
-
-(defmacro if-this->then (athing atest adefault &body body)
-  "Similar to `if-then` but takes a thing to test, a predicate function,
-   and what to return if all else fails
-  Example:
-    (if-this->then *character* #'string= nil
-      •cosmo•   ->  •kramer•
-      •george•  ->  •constanza•
-      •elaine•  ->  •benes•
-      •jerry•   ->  •seinfeld•)"
-  (with-gensyms (thething thetest thedefault)
-    (labels ((group-them (alist)
-      (unless (null alist)
-        (cons `((funcall ,thetest ,(car alist) ,thething) ,(caddr alist))
-              (group-them (cdddr alist))))))
-    (let ((in-3s (group-them body)))
-      `(let ((,thething ,athing)
-             (,thetest  ,atest)
-             (,thedefault ,adefault))
-         (cond ,@(group-them body)
-               (t            ,thedefault)))))))
-
 ; --------------------------------------------------------------- ;
 
 
-; --------------------------------------------------------------- ;
-; HTML/XML stuff
-(abbr request drakma:http-request)
-
-(defmacro request (&rest everything)
-  `(drakma:http-request ,@everything))
-
-(defun parse-xml (astring)
-  (cxml:parse astring (cxml-dom:make-dom-builder)))
-
-(defun parse-xml-file (afile)
-  (cxml:parse-file afile (cxml-dom:make-dom-builder)))
-
-(defun xpath (doc anxpath &key (all t) (compiled-p nil) (text nil))
-  (let ((result (if compiled-p
-                  (xpath:evaluate-compiled anxpath doc)
-                  (xpath:evaluate anxpath doc))))
-    (unless (xpath:node-set-empty-p result)
-      (if (and all text)
-        (mapcar (lambda (x) (xpath:string-value x)) (xpath:all-nodes result))
-        (if (and all (not text))
-          (xpath:all-nodes result)
-          (if (and (not all) text)
-            (xpath:string-value result)
-            result))))))
-
-(defmacro xpath-compile (&rest everything)
-  `(xpath:compile-xpath ,@everything))
-
-(defmacro use-xml-namespace (anns)
-  `(setq xpath::*dynamic-namespaces*
-         (cons
-           (cons nil ,anns)
-           xpath::*dynamic-namespaces*)))
-
-(abbr xpath-string xpath:string-value)
-
-; --------------------------------------------------------------- ;
 
 
 ; --------------------------------------------------------------- ;
@@ -1156,6 +1091,7 @@
 (defun prettify-time-output (thetimeoutput)
   (subseq thetimeoutput 0 (- (length thetimeoutput) 4)))
 
+; REALLY LOOK INTO THIS BECAUSE THERE ARE A LOT OF WARNINGS AND IT SUCKS
 (defun clix-log-verbose (stream char arg)
   ;;;;;; HOW UNHYGENIC IS THIS???!!
   (declare (ignore char))
@@ -1182,6 +1118,7 @@
            thereturnvalue)))))
 
 
+; REALLY LOOK INTO THIS BECAUSE THERE ARE A LOT OF WARNINGS AND IT SUCKS
 (defun clix-log-just-echo (stream char arg)
   ;;;;;; HOW UNHYGENIC IS THIS???!!
   (declare (ignore char))
@@ -1213,7 +1150,7 @@
 
 
 ; --------------------------------------------------------------- ;
-; very hacky interface to R for emergencies
+; very hacky "interface" to R for emergencies
 ; because LITERALLY NOTHING ELSE WORKS!
 
 (defun r-get (acommand &key (type *read-default-float-format*) (what :raw))

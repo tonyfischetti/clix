@@ -2,33 +2,37 @@
 
 #-quicklisp (load "~/quicklisp/setup.lisp")
 
+
 (setf sb-int:*repl-prompt-fun* (lambda (stream) (format stream "~%λ ")))
+
+
 (if (member "--no-linedit" sb-ext:*posix-argv* :test 'equal)
-  (setf sb-ext:*posix-argv*
-        (remove "--no-linedit" sb-ext:*posix-argv* :test 'equal))
+  (setf sb-ext:*posix-argv* (remove "--no-linedit" sb-ext:*posix-argv* :test 'equal))
   (when (interactive-stream-p *terminal-io*)
     (require :sb-aclrepl)
-    ; (ql:quickload "linedit") ; :silent t)
     (ql:quickload "linedit" :silent t)
-    (funcall (intern "INSTALL-REPL" :linedit) :wrap-current t
-                                              :eof-quits t)))
+    (funcall (intern "INSTALL-REPL" :linedit) :wrap-current t :eof-quits t)))
 
-; (when (member "--with-clix" sb-ext:*posix-argv* :test 'equal)
-;   (ql:register-local-projects)
-;   (ql:quickload :clix)
-;   (use-package :clix))
 
-(unless (member "--without-clix" sb-ext:*posix-argv* :test 'equal)
-  (ql:quickload :clix :silent t)
-  (use-package :clix))
+(if (member "--without-clix" sb-ext:*posix-argv* :test 'equal)
+  (setf sb-ext:*posix-argv* (remove "--without-clix" sb-ext:*posix-argv* :test 'equal))
+  (progn
+    (ql:quickload :clix :silent t)
+    (use-package :clix)))
 
-(unless (member "--warnings" sb-ext:*posix-argv* :test 'equal)
-  (declaim (sb-ext:muffle-conditions cl:warning))
-  (declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
-  (setf sb-debug:*debug-beginner-help-p* nil)
-  (setf sb-debug:*backtrace-frame-count* 7))
 
-; (sb-int:set-floating-point-modes :traps nil)
+(when (member "--print-readably" sb-ext:*posix-argv* :test 'equal)
+  (progn
+    (setf sb-ext:*posix-argv* (remove "--print-readably" sb-ext:*posix-argv* :test 'equal))
+    (setq *PRINT-READABLY* t)))
 
-; (setq *PRINT-READABLY* t)
+
+(if (member "--warnings" sb-ext:*posix-argv* :test 'equal)
+  (setf sb-ext:*posix-argv* (remove "--warnings" sb-ext:*posix-argv* :test 'equal))
+  (progn
+    (declaim (sb-ext:muffle-conditions cl:warning))
+    (declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
+    (setf sb-debug:*debug-beginner-help-p* nil)
+    (setf sb-debug:*backtrace-frame-count* 5)))
+
 
