@@ -20,6 +20,9 @@
     (ql:quickload :clix :silent t)
     (use-package :clix)))
 
+(when (member "--with-cl-repl" sb-ext:*posix-argv* :test 'equal)
+  (setf sb-ext:*posix-argv* (remove "--with-cl-repl" sb-ext:*posix-argv* :test 'equal))
+  (ql:quickload :cl-repl :silent t))
 
 (when (member "--print-readably" sb-ext:*posix-argv* :test 'equal)
   (progn

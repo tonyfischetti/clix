@@ -1,0 +1,27 @@
+(in-package cl-repl)
+
+(defun color (color string)
+  (if (null color)
+      string
+      (format nil "~c[38;5;~am~a~c[0m" #\ESC color string #\ESC)))
+
+(defparameter *default-prompt-color* 40)
+(defparameter *debugger-prompt-color* 9)
+(defparameter *logo-color* 9)
+(defparameter *output-indicator-color* 9)
+(defparameter *splash-color* 9)
+(defparameter *condition-color* 9)
+(defparameter *section-color* 21)
+(defparameter *message-color* 248)
+
+(defparameter *magic-syntax-color* 39)
+(defparameter *string-syntax-color* 184)
+(defparameter *variable-syntax-color* 118)
+(defparameter *constant-syntax-color* 118)
+(defparameter *lambda-syntax-color* 39)
+(defparameter *definition-syntax-color* 118)
+(defparameter *keyword-syntax-color* 39)
+(defparameter *special-syntax-color* 197)
+(defparameter *function-syntax-color* 197)
+(defparameter *boolean-syntax-color* 197)
+(defparameter *normal-syntax-color*  nil)

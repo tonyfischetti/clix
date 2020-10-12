@@ -1,0 +1,19 @@
+#!/bin/sh
+#|-*- mode:lisp -*-|#
+#| A repl implementation of Common Lisp
+exec ros -Q -L sbcl-bin -- $0 "$@"
+|#
+(progn ;;init forms
+  (ros:ensure-asdf)
+  (unless (find-package :cl-repl)
+    (ql:quickload :cl-repl :silent t)))
+
+(defpackage :ros.script.cl-repl.3724301384
+  (:use :cl))
+(in-package :ros.script.cl-repl.3724301384)
+
+(defun main (&rest argv)
+  (declare (ignorable argv))
+  (cl-repl:main argv))
+
+;;; vim: set ft=lisp lisp:

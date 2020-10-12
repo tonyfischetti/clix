@@ -1,0 +1,21 @@
+
+; vi: ft=lisp
+
+(in-package :repl-user)
+
+(setf *default-prompt-function*
+  #'(lambda () "λ "))
+
+(color-scheme "default")
+
+;; You can define your own magic commands
+;; If you want to put some message on the screen, use `cl-repl:message-from-magic` instead of `cl:format`.
+;; This function always returns `"nil"` (not `nil`).
+(define-magic pwd (&rest args)
+  (declare (ignore args))
+  ; Put usage in one line. This documentation can be refer by %help magic.
+  "Show current working directory."
+  ; Return value should be readable by cl:read-from-string
+  (format nil "~s" *default-pathname-defaults*))
+
+; vi: ft=lisp
