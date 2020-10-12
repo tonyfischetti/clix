@@ -26,8 +26,8 @@
            :with-hash-entry   :if-hash-entry      :if-not-hash-entry
            :entry!            :die                :or-die
            :or-do             :die-if-null        :advise
-           :error!            :alistp             :cmdargs 
-           :clear-screen      :-<>                :<> 
+           :error!            :alistp             :cmdargs
+           :clear-screen      :-<>                :<>
            :zsh               :universal->unix-time
            :unix->universal-time                  :get-unix-time
            :make-pretty-time  :get-current-time   :with-time
@@ -53,7 +53,10 @@
            :export-json       :λ                  :string->octets
            :octets->string    :make-octet-vector :concat-octet-vector
            :parse-html        :$$                 :r-get
-           :with-r            :parse-float))
+           :with-r            :parse-float        :get-terminal-columns
+           :+ansi-escape-up+  :+ansi-escape-left-all+
+           :make-ansi-escape  :ansi-clear-line    :ansi-up-line
+           :ansi-left-all     :progress-bar))
 
 (in-package :clix)
 
@@ -85,18 +88,36 @@
 
 (defparameter *clix-external-format* :UTF-8)
 
-(defvar +red-bold+              (format nil "~c[31;1m" #\ESC))
-(defvar +green-bold+            (format nil "~c[32;1m" #\ESC))
-(defvar +yellow-bold+           (format nil "~c[33;1m" #\ESC))
-(defvar +blue-bold+             (format nil "~c[34;1m" #\ESC))
-(defvar +magenta-bold+          (format nil "~c[35;1m" #\ESC))
-(defvar +cyan-bold+             (format nil "~c[36;1m" #\ESC))
-(defvar +reset-terminal-color+  (format nil "~c[0m"    #\ESC))
 
-(defmacro green   (&rest everything) `(fn "~A~A~A" +green-bold+   (fn ,@everything) +reset-terminal-color+))
-(defmacro red     (&rest everything) `(fn "~A~A~A" +red-bold+     (fn ,@everything) +reset-terminal-color+))
-(defmacro yellow  (&rest everything) `(fn "~A~A~A" +yellow-bold+  (fn ,@everything) +reset-terminal-color+))
-(defmacro cyan    (&rest everything) `(fn "~A~A~A" +cyan-bold+    (fn ,@everything) +reset-terminal-color+))
+(defun make-ansi-escape (anum &optional (decoration 'bold))
+  (format nil "~c[~A~Am" #\ESC anum (cond
+                                      ((eq decoration 'bold)        ";1")
+                                      ((eq decoration 'underline)   ";4")
+                                      ((eq decoration 'reversed)    ";7")
+                                      (t                            ""))))
+
+(defvar +reset-terminal-color+  (make-ansi-escape 0 nil))
+(defvar +magenta-bold+          (make-ansi-escape 35))
+(defvar +red-bold+              (make-ansi-escape 31))
+(defvar +yellow-bold+           (make-ansi-escape 33))
+(defvar +green-bold+            (make-ansi-escape 32))
+(defvar +cyan-bold+             (make-ansi-escape 36))
+(defvar +blue-bold+             (make-ansi-escape 34))
+
+(defvar +ansi-escape-up+        (format nil "~c[1A" #\ESC))
+(defvar +ansi-escape-left-all+  (format nil "~c[500D" #\ESC))
+
+(defun do-with-color (acolor thestring &rest everything)
+  (apply #'format nil
+         (format nil "~A~A~A" acolor thestring +reset-terminal-color+)
+         everything))
+
+(defun green  (thestring &rest things) (apply #'do-with-color +green-bold+ thestring things))
+(defun red    (thestring &rest things) (apply #'do-with-color +red-bold+ thestring things))
+(defun yellow (thestring &rest things) (apply #'do-with-color +yellow-bold+ thestring things))
+(defun cyan   (thestring &rest things) (apply #'do-with-color +cyan-bold+ thestring things))
+
+
 
 (defparameter *clix-zsh* "/usr/local/bin/zsh")
 
@@ -966,7 +987,7 @@
 
 
 ; --------------------------------------------------------------- ;
-; useful macros
+; useful macros / functions
 (defmacro debug-these (&rest therest)
   """
   Macro that takes an arbitrary number of arguments,
@@ -1036,6 +1057,45 @@
               (loop for i in alist collect `(defparameter ,i nil))))
     (let ((tmp (helper body)))
      `(progn  ,@tmp))))
+
+
+(defun get-terminal-columns ()
+  "Retrieves the number of columns in terminal by querying
+   `$COLUMNS` environment variable. Returns
+   (values num-of-columns t) if successful and (values 200 nil)
+   if not"
+  (let ((raw-res (ignore-errors (parse-integer (zsh "echo $COLUMNS")))))
+    (if raw-res (values raw-res t) (values 200 nil))))
+
+(defun ansi-up-line (&optional (where *error-output*))
+  (format where "~A" +ansi-escape-up+))
+
+(defun ansi-left-all (&optional (where *error-output*))
+  (format where "~A" +ansi-escape-left-all+))
+
+(defun ansi-clear-line (&optional (where *error-output*))
+  (ansi-left-all)
+  (format where "~A" (make-string (get-terminal-columns) :initial-element #\Space)))
+
+
+(defun progress-bar (index limit &key (interval 1)
+                                      (where *error-output*)
+                                      (width 50)
+                                      (one-line t)
+                                      (out-of nil))
+  (when (or (= index limit) (and (= 0 (mod index interval))))
+    (let* ((perc-done (/ index limit))
+           (filled    (round (* perc-done width))))
+      (when one-line
+        (ansi-up-line     where)
+        (ansi-clear-line  where)
+        (ansi-left-all    where))
+      (format where (yellow "~&|~A~A| ~$%~A"
+              (make-string filled :initial-element #\=)
+              (make-string (max 0 (- width filled)) :initial-element #\Space)
+              (float (* 100 perc-done))
+              (if out-of (fn "~C~A/~A" #\Tab index limit) "")))
+      (force-output where))))
 
 ; --------------------------------------------------------------- ;
 
