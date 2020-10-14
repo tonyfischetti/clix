@@ -1136,13 +1136,11 @@
     `(progn
        (defun ,tmp ()
          ,@body)
-       (defun ,wrapper ()
-         (setq ,the-return (,tmp)))
-       (let ((,long-thread      (bt:make-thread #',wrapper
+       (let ((,long-thread      (bt:make-thread #',tmp
                                                 :name "long-thread"))
              (,loading-thread   (bt:make-thread #'loading-forever
                                                 :name "loading-thread")))
-         (bt:join-thread ,long-thread)
+         (setq ,the-return (bt:join-thread ,long-thread))
          (bt:destroy-thread ,loading-thread)
          (terpri)
          ,the-return))))
