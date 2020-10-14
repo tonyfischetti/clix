@@ -56,7 +56,8 @@
            :with-r            :parse-float        :get-terminal-columns
            :+ansi-escape-up+  :+ansi-escape-left-all+
            :make-ansi-escape  :ansi-clear-line    :ansi-up-line
-           :ansi-left-all     :progress-bar))
+           :ansi-left-all     :+ansi-escape-left-one+
+           :ansi-left-one     :progress-bar       :with-loading))
 
 (in-package :clix)
 
@@ -106,6 +107,7 @@
 
 (defvar +ansi-escape-up+        (format nil "~c[1A" #\ESC))
 (defvar +ansi-escape-left-all+  (format nil "~c[500D" #\ESC))
+(defvar +ansi-escape-left-one+ (format nil "~c[1D" #\ESC))
 
 (defun do-with-color (acolor thestring &rest everything)
   (apply #'format nil
@@ -198,9 +200,11 @@
 ;---------------------------------------------------------;
 ; for-each and friends
 (declaim (inline progress))
-(defun progress (index limit &key (interval 1) (where *error-output*))
+(defun progress (index limit &key (interval 1) (where *error-output*) (newline-p t))
   (when (= 0 (mod index interval))
-    (format where (yellow "~A of ~A..... [~$%]~%" index limit (* 100 (/ index limit))))))
+    (format where (yellow "~A of ~A..... [~$%]"
+                          index limit (* 100 (/ index limit))))
+    (when newline-p (format where "~%"))))
 
 (defmacro break! ()
   "For use with `for-each`
@@ -402,14 +406,9 @@
    Wrapper around cl-ppcre:scan"
   `(if (cl-ppcre:scan ,pattern ,astr ,@everything) t nil))
 
-; RIPE FOR RE-WRITING
 (defun str-subset (anlist pattern)
   "Returns all elements that match pattern"
-  (let ((ret nil))
-    (for-each/list anlist
-      (when (str-detect value! pattern)
-        (setq ret (append ret (list value!)))))
-    ret))
+  (remove-if-not (lambda (x) (str-detect x pattern)) anlist))
 
 (defun str-scan-to-strings (astr pattern)
   "Wrapper around cl-ppcre:scan-to-strings with string first
@@ -1077,6 +1076,9 @@
   (ansi-left-all)
   (format where "~A" (make-string (get-terminal-columns) :initial-element #\Space)))
 
+(defun ansi-left-one (&optional (where *error-output*))
+  (format where "~A" +ansi-escape-left-one+))
+
 
 (defun progress-bar (index limit &key (interval 1)
                                       (where *error-output*)
@@ -1096,6 +1098,54 @@
               (float (* 100 perc-done))
               (if out-of (fn "~C~A/~A" #\Tab index limit) "")))
       (force-output where))))
+
+
+(defun loading-forever ()
+  (let ((counter -1))
+    (forever
+      (incf counter)
+      (setq counter (mod counter 4))
+      (let ((rune (cond
+                    ((= counter 0) "-")
+                    ((= counter 1) (fn "~C" #\Backslash))
+                    ((= counter 2) "|")
+                    (t "/"))))
+        (format t "~A" rune)
+        (force-output)
+        (ansi-left-one *standard-output*)
+        (sleep 0.1)))))
+
+
+(defmacro with-loading (&body body)
+  "This function runs `body` in a separate thread
+   and also starts a thread that displays a spinner.
+   When the `body` thread finishes, it kills the
+   spinner thread. Here's an example....
+   ```
+    (for-each `(heaven or las vegas)
+      (ft •processing: ~10A~C• value! #\Tab)
+      (with-loading
+        (sleep 3)))
+    ```
+    its particularly neat combined with
+    ```
+    (progress index! 5 :newline-p nil :where *standard-output*)
+    (ft •~C• #\Tab #\Tab)
+    ``` "
+  (with-gensyms (tmp long-thread loading-thread wrapper the-return)
+    `(progn
+       (defun ,tmp ()
+         ,@body)
+       (defun ,wrapper ()
+         (setq ,the-return (,tmp)))
+       (let ((,long-thread      (bt:make-thread #',wrapper
+                                                :name "long-thread"))
+             (,loading-thread   (bt:make-thread #'loading-forever
+                                                :name "loading-thread")))
+         (bt:join-thread ,long-thread)
+         (bt:destroy-thread ,loading-thread)
+         (terpri)
+         ,the-return))))
 
 ; --------------------------------------------------------------- ;
 
