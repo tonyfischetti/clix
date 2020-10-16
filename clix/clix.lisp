@@ -51,7 +51,7 @@
            :xpath-string      :alist->hash-table  :hash-table->alist
            :hash-keys         :parse-json         :parse-json-file
            :export-json       :λ                  :string->octets
-           :octets->string    :make-octet-vector :concat-octet-vector
+           :octets->string    :make-octet-vector  :concat-octet-vector
            :parse-html        :$$                 :r-get
            :with-r            :parse-float        :get-terminal-columns
            :+ansi-escape-up+  :+ansi-escape-left-all+
@@ -1105,11 +1105,11 @@
     (forever
       (incf counter)
       (setq counter (mod counter 4))
-      (let ((rune (cond
-                    ((= counter 0) "-")
-                    ((= counter 1) (fn "~C" #\Backslash))
-                    ((= counter 2) "|")
-                    (t "/"))))
+      (let ((rune (case counter
+                    (0  "-")
+                    (1  (fn "~C" #\Backslash))
+                    (2  "|")
+                    (t  "/"))))
         (format t "~A" rune)
         (force-output)
         (ansi-left-one *standard-output*)
