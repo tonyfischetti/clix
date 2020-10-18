@@ -156,6 +156,10 @@
   `(labels ((self! ,params ,@body))
      #'self!))
 
+(defmacro abbr (short long)
+  `(defmacro ,short (&rest everything)
+     `(,',long ,@everything)))
+
 ; ------------------------------------------------------- ;
 
 (defun die (message &key (status 1) (red-p t))
@@ -444,12 +448,13 @@
   "Alias to re-compile"
   `(re-compile ,@everything))
 
+
+
 ; --------------------------------------------------------------- ;
 
 
 ;---------------------------------------------------------;
 ; convenience
-
 
 (defmacro aif (test then &optional else)
   "Like IF. IT is bound to TEST."
@@ -612,58 +617,11 @@
 
 ;---------------------------------------------------------;
 ; Stolen or inspired by https://github.com/vseloved/rutils/
-(define-condition rutils-style-warning (simple-condition style-warning) ())
 
 (defmacro eval-always (&body body)
   "Wrap BODY in eval-when with all keys (compile, load and execute) mentioned."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      ,@body))
-
-(defmacro abbr (short long &optional lambda-list)
-  "Abbreviate LONG macro or function name as SHORT.
-   If LAMBDA-LIST is present, also copy appropriate SETF-expander."
-  `(eval-always
-     ;; Lispworks signals error while abbreviating to keywords
-     ;; SBCL has package locks when accessing built-in functionality
-     ;; other similar things are probably possible in other implementations
-     (handler-bind ((error (lambda (e)
-                             (let ((r (find-restart 'continue e)))
-                               (when r
-                                 (warn 'rutils-style-warning
-                                       :format-control
-                                       "Skipped error during abbreviation: ~A"
-                                       :format-arguments (list e))
-                                 (invoke-restart r))))))
-       (cond
-         ((macro-function ',long)
-          (setf (macro-function ',short) (macro-function ',long))
-          #+ccl (setf (ccl:arglist ',short) (ccl:arglist ',long)))
-         ((special-operator-p ',long)
-          (error "Can't abbreviate a special-operator ~a" ',long))
-         ((fboundp ',long)
-          (setf (fdefinition ',short) (fdefinition ',long))
-          #+ccl (setf (ccl:arglist ',short) (ccl:arglist ',long))
-          ,(when lambda-list
-            `(define-setf-expander ,short ,lambda-list
-               (values ,@(multiple-value-bind
-                          (dummies vals store store-form access-form)
-                          (get-setf-expansion
-                           (cons long (remove-if (lambda (sym)
-                                                   (member sym '(&optional &key)))
-                                                 lambda-list)))
-                          (let ((expansion-vals (mapcar (lambda (x) `(quote ,x))
-                                                        (list dummies
-                                                              vals
-                                                              store
-                                                              store-form
-                                                              access-form))))
-                            (setf (second expansion-vals)
-                                  (cons 'list vals))
-                            expansion-vals))))))
-         (t
-          (error "Can't abbreviate ~a" ',long)))
-       (setf (documentation ',short 'function) (documentation ',long 'function))
-',short)))
 
 
 (defun str-join (delim strings)
