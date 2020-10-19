@@ -57,7 +57,8 @@
            :+ansi-escape-up+  :+ansi-escape-left-all+
            :make-ansi-escape  :ansi-clear-line    :ansi-up-line
            :ansi-left-all     :+ansi-escape-left-one+
-           :ansi-left-one     :progress-bar       :with-loading))
+           :ansi-left-one     :progress-bar       :with-loading
+           :flatten           :take               :group))
 
 (in-package :clix)
 
@@ -133,6 +134,8 @@
 
 
 ;---------------------------------------------------------;
+; Some utilities
+
 ; Stolen from "Practical Common Lisp"
 (defmacro with-gensyms ((&rest names) &body body)
   "Why mess with the classics"
@@ -159,6 +162,31 @@
 (defmacro abbr (short long)
   `(defmacro ,short (&rest everything)
      `(,',long ,@everything)))
+
+(defun flatten (alist)
+  " Flattens a list (possibly inefficiently)"
+  (if (null alist)
+    nil
+    (if (listp (car alist))
+      (append (flatten (car alist)) (flatten (cdr alist)))
+      (cons (car alist) (flatten (cdr alist))))))
+
+(defun take (alist n &optional (acc nil))
+  "Takes `n` from beginning of `alist` and returns that in a
+   list. It also returns the remainder of the list (use
+   `multiple-value-bind` with it"
+  (when (and (> n 0) (null alist)) (error "not enough to take"))
+  (if (= n 0)
+    (values (nreverse acc) alist)
+    (take (cdr alist) (- n 1) (cons (car alist) acc))))
+
+
+(defun group (alist &optional (n 2) (acc nil))
+  "Turn a (flat) list into a list of lists of length `n`"
+  (if (null alist)
+    (nreverse acc)
+    (multiple-value-bind (eins zwei) (take alist n)
+      (group zwei n (cons eins acc)))))
 
 ; ------------------------------------------------------- ;
 
