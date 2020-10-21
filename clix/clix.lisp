@@ -58,7 +58,9 @@
            :make-ansi-escape  :ansi-clear-line    :ansi-up-line
            :ansi-left-all     :+ansi-escape-left-one+
            :ansi-left-one     :progress-bar       :with-loading
-           :flatten           :take               :group))
+           :flatten           :take               :group
+           :mkstr             :create-symbol      :create-keyword
+           :walk-replace-sexp))
 
 (in-package :clix)
 
@@ -165,8 +167,7 @@
 
 (defun flatten (alist)
   " Flattens a list (possibly inefficiently)"
-  (if (null alist)
-    nil
+  (if alist
     (if (listp (car alist))
       (append (flatten (car alist)) (flatten (cdr alist)))
       (cons (car alist) (flatten (cdr alist))))))
@@ -180,13 +181,42 @@
     (values (nreverse acc) alist)
     (take (cdr alist) (- n 1) (cons (car alist) acc))))
 
-
 (defun group (alist &optional (n 2) (acc nil))
   "Turn a (flat) list into a list of lists of length `n`"
   (if (null alist)
     (nreverse acc)
     (multiple-value-bind (eins zwei) (take alist n)
       (group zwei n (cons eins acc)))))
+
+; stolen from "Let Over Lambda"
+(defun mkstr (&rest args)
+  "PRINCs `args` into a string and returns it"
+  (with-output-to-string (s)
+    (dolist (a args) (princ a s))))
+
+(defun create-symbol (&rest args)
+  "Interns an UP-cased string as a symbol. Uses `mkstr` to
+   make a string out of all of the `args`"
+  (values (intern (string-upcase (apply #'mkstr args)))))
+
+(defun create-keyword (&rest args)
+  "Interns an UP-cased string as a keyword symbol. Uses `mkstr` to
+   make a string out of all of the `args`"
+  (values (intern (string-upcase (apply #'mkstr args)) :keyword)))
+
+(defun walk-replace-sexp (alist oldform newform &key (test #'equal))
+  "Walks sexpression substituting `oldform` for `newform`.
+   It works with lists and well as atoms. Checks equality with `test`
+   (which is #'EQUAL by default)"
+  (if alist
+    (let ((thecar (car alist)))
+      (if (listp thecar)
+        (if (tree-equal thecar oldform :test test)
+          (cons newform (walk-replace-sexp (cdr alist) oldform newform :test test))
+          (cons (walk-replace-sexp thecar oldform newform :test test)
+                (walk-replace-sexp (cdr alist) oldform newform :test test)))
+        (let ((rplment (if (funcall test thecar oldform) newform thecar)))
+          (cons rplment (walk-replace-sexp (cdr alist) oldform newform :test test)))))))
 
 ; ------------------------------------------------------- ;
 
