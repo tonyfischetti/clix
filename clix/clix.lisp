@@ -60,7 +60,7 @@
            :ansi-left-one     :progress-bar       :with-loading
            :flatten           :take               :group
            :mkstr             :create-symbol      :create-keyword
-           :walk-replace-sexp))
+           :walk-replace-sexp :give-choices))
 
 (in-package :clix)
 
@@ -669,7 +669,6 @@
                     forms))
      <>))
 
-
 ; ------------------------------------------------------- ;
 
 
@@ -1160,6 +1159,39 @@
          (bt:destroy-thread ,loading-thread)
          (terpri)
          ,the-return))))
+
+
+(defun give-choices (choices &key (limit 37)
+                                  (num-p nil)
+                                  (mode :table)
+                                  (sep nil))
+  "Uses `smenu` (must be installed) to give the user some choices in
+   a list (princs the elements). The user's choice(s) are returned
+   unless they Control-C, in which case it return `nil`. You can also
+   use '/' to search through the choices!
+   It's (smenu) is very flexible and this function offers a lot
+   of optional keyword parameters
+   `limit` sets the limit of choices (and presents a scroll bar)
+   `num-p` if true, puts a number next to the choices for easy
+           selection (default nil)
+   `mode` :table (default), :columns, :lines, and nil
+   `sep` if not nil, it will allow the user to select multiple choices (with
+         't') and this string will separate them all"
+  (let ((tmpvar   (fn "tmp~A"   (get-unix-time)))
+        (xchoice  (fn "'~A'"    (str-join "'\\n'" choices)))
+        (xmode    (case mode
+                    (:columns   "-c")
+                    (:table     "-t")
+                    (:lines     "-l")
+                    (otherwise  ""))))
+    (let ((response
+            (zsh (fn "~A=$(echo -e \"~A\" | smenu ~A -n~A ~A ~A); echo $~A"
+                     tmpvar xchoice (if num-p "-N" "")
+                     limit xmode
+                     (if sep (fn "-T '~A'" sep) "")
+                     tmpvar) :echo nil)))
+      (if (string= response "") nil response))))
+
 
 ; --------------------------------------------------------------- ;
 
