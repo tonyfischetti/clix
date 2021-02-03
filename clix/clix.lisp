@@ -41,9 +41,11 @@
            :substr            :interpose          :print-hash-table
            :re-compile        :str-split          :str-replace
            :str-replace-all   :str-detect         :str-subset
+           :str-extract
            :str-scan-to-strings                   :str-trim
            :~m                :~r                 :~ra
            :~s                :~f                 :~c
+           :~e
            :debug-these       :with-a-file        :stream!
            :rnorm             :delim              :defparams
            :request           :parse-xml          :parse-xml-file
@@ -60,7 +62,7 @@
            :ansi-left-one     :progress-bar       :with-loading
            :flatten           :take               :group
            :mkstr             :create-symbol      :create-keyword
-           :walk-replace-sexp :give-choices))
+           :walk-replace-sexp :give-choices       :copy-file-ensure-dirs-too))
 
 (in-package :clix)
 
@@ -472,6 +474,17 @@
   "Returns all elements that match pattern"
   (remove-if-not (lambda (x) (str-detect x pattern)) anlist))
 
+(defun str-extract (astr pattern)
+  "If one match, it returns the register group as a string.
+   If more than one match/register-group, returns a list
+   of register groups. If there is a match but no register
+   group, it will still return nil"
+  (multiple-value-bind (dontneed need)
+    (cl-ppcre:scan-to-strings pattern astr)
+    (let ((ret (coerce need 'list)))
+      (if (= (length ret) 1)
+        (car ret) ret))))
+
 (defun str-scan-to-strings (astr pattern)
   "Wrapper around cl-ppcre:scan-to-strings with string first
    and only returns the important part (the vector of matches)"
@@ -506,6 +519,9 @@
   "Alias to re-compile"
   `(re-compile ,@everything))
 
+(defmacro ~e (&rest everything)
+  "Alias to str-extract"
+  `(str-extract ,@everything))
 
 
 ; --------------------------------------------------------------- ;
@@ -1192,6 +1208,19 @@
                      tmpvar) :echo nil)))
       (if (string= response "") nil response))))
 
+
+(defun copy-file-ensure-dirs-too (thefrom theto &key (overwrite-p nil))
+  "Copy a file to a location while ensuring all the directories in
+   destination are present (will make them is necessary).
+   If destination is a directory, IT MUST END IN A SLASH"
+  (unless (probe-file thefrom)
+    (error "'from' file doesn't exist"))
+  (let ((dirname      (directory-namestring theto))
+        (frombasename (file-namestring thefrom)))
+    (when (string= theto dirname)
+      (setq theto (fn "~A~A" dirname frombasename)))
+    (ensure-directories-exist dirname)
+    (cl-fad:copy-file thefrom theto :overwrite overwrite-p)))
 
 ; --------------------------------------------------------------- ;
 
