@@ -62,7 +62,8 @@
            :ansi-left-one     :progress-bar       :with-loading
            :flatten           :take               :group
            :mkstr             :create-symbol      :create-keyword
-           :walk-replace-sexp :give-choices       :copy-file-ensure-dirs-too))
+           :walk-replace-sexp :give-choices       :copy-file-ensure-dirs-too
+           :slurp-lines))
 
 (in-package :clix)
 
@@ -544,6 +545,12 @@
       (read-sequence data stream)
       data)))
 
+(defun slurp-lines (afilename)
+  "Reads lines of a file into a list"
+  (with-open-file (tmp afilename :if-does-not-exist :error
+                       :external-format *clix-external-format*)
+    (loop for value = (read-line tmp nil)
+          while value collect value)))
 
 (defun barf (path contents &key (printfn #'write-string) (overwrite nil))
   "Outputs CONTENTS into filename PATH with function PRINTFN
