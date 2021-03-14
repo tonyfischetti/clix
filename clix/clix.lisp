@@ -1222,12 +1222,15 @@
    If destination is a directory, IT MUST END IN A SLASH"
   (unless (probe-file thefrom)
     (error "'from' file doesn't exist"))
-  (let ((dirname      (directory-namestring theto))
-        (frombasename (file-namestring thefrom)))
+  (let* ((dirname      (directory-namestring theto))
+         (fromdirname  (directory-namestring thefrom))
+         (frombasename (file-namestring thefrom))
+         (fullmakedir  (fn "~A/~A" dirname fromdirname)))
     (when (string= theto dirname)
       (setq theto (fn "~A~A" dirname frombasename)))
-    (ensure-directories-exist dirname)
-    (cl-fad:copy-file thefrom theto :overwrite overwrite-p)))
+    (ensure-directories-exist fullmakedir)
+    (let ((ultimateto (fn "~A/~A" fullmakedir frombasename)))
+      (cl-fad:copy-file thefrom ultimateto :overwrite overwrite-p))))
 
 ; --------------------------------------------------------------- ;
 
