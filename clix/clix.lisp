@@ -62,8 +62,7 @@
            :ansi-left-one     :progress-bar       :with-loading
            :flatten           :take               :group
            :mkstr             :create-symbol      :create-keyword
-           :walk-replace-sexp :give-choices       :copy-file-ensure-dirs-too
-           :slurp-lines))
+           :walk-replace-sexp :give-choices       :slurp-lines))
 
 (in-package :clix)
 
@@ -1214,23 +1213,6 @@
                      (if sep (fn "-T '~A'" sep) "")
                      tmpvar) :echo nil)))
       (if (string= response "") nil response))))
-
-
-(defun copy-file-ensure-dirs-too (thefrom theto &key (overwrite-p nil))
-  "Copy a file to a location while ensuring all the directories in
-   destination are present (will make them is necessary).
-   If destination is a directory, IT MUST END IN A SLASH"
-  (unless (probe-file thefrom)
-    (error "'from' file doesn't exist"))
-  (let* ((dirname      (directory-namestring theto))
-         (fromdirname  (directory-namestring thefrom))
-         (frombasename (file-namestring thefrom))
-         (fullmakedir  (fn "~A/~A" dirname fromdirname)))
-    (when (string= theto dirname)
-      (setq theto (fn "~A~A" dirname frombasename)))
-    (ensure-directories-exist fullmakedir)
-    (let ((ultimateto (fn "~A/~A" fullmakedir frombasename)))
-      (cl-fad:copy-file thefrom ultimateto :overwrite overwrite-p))))
 
 ; --------------------------------------------------------------- ;
 
