@@ -576,6 +576,7 @@
     (funcall printfn contents stream)))
 
 
+#+sbcl
 (defun zsh (acommand &key (dry-run nil)
                           (err-fun #'(lambda (code stderr) (error (format nil "~A (~A)" stderr code))))
                           (echo nil)
