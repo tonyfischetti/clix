@@ -600,12 +600,12 @@
     (unless dry-run
       (let* ((outs        (if return-string (make-string-output-stream) t))
              (errs        (make-string-output-stream))
-             (theprocess  (run-program *clix-zsh* `("-c" ,acommand)
-                                       :input in
-                                       :output outs
-                                       :error  errs
-                                       :external-format enc))
-             (retcode     (process-exit-code theprocess)))
+             (theprocess  (sb-ext:run-program *clix-zsh* `("-c" ,acommand)
+                                              :input in
+                                              :output outs
+                                              :error  errs
+                                              :external-format enc))
+             (retcode     (sb-ext:process-exit-code theprocess)))
         (when (> retcode 0)
           (funcall err-fun retcode (strip (get-output-stream-string errs))))
         (when return-string
@@ -681,7 +681,7 @@
   "A multi-implementation function to return argv (program name is CAR)"
   (or
    #+CLISP (cons "program_name" *args*)
-   #+SBCL *posix-argv*
+   #+SBCL sb-ext:*posix-argv*
    #+LISPWORKS system:*line-arguments-list*
    #+CMU extensions:*command-line-words*
    nil))
