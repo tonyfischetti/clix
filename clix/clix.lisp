@@ -9,7 +9,7 @@
 
 
 (defpackage :clix
-  (:use :common-lisp :sb-ext)
+  (:use :common-lisp)
   (:import-from :parse-float :parse-float)
   (:export :fn                :ft                 :info
            :*clix-output-stream*
@@ -261,7 +261,7 @@
 
 
 
-;---------------------------------------------------------;
+; ;---------------------------------------------------------;
 ; for-each and friends
 (declaim (inline progress))
 (defun progress (index limit &key (interval 1) (where *error-output*) (newline-p t))
@@ -293,7 +293,9 @@
            (block this-loop!
               (loop for value! = (read-line ,instream nil)
                     while value! do (progn (incf index!) (block this-pass! ,@body))))))
-       (sb-sys:interactive-interrupt ()
+      (#+sbcl sb-sys:interactive-interrupt
+       #+ecl  ext:interactive-interrupt
+        ()
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
@@ -309,7 +311,9 @@
                 (dolist (value! ,the-list)
                   (incf index!)
                   (block this-pass! ,@body))))
-       (sb-sys:interactive-interrupt ()
+      (#+sbcl sb-sys:interactive-interrupt
+       #+ecl  ext:interactive-interrupt
+        ()
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
@@ -326,7 +330,9 @@
                       do (progn (incf index!)
                                 (setq value! (gethash key! ,the-hash))
                                 (block this-pass! ,@body)))))
-       (sb-sys:interactive-interrupt ()
+      (#+sbcl sb-sys:interactive-interrupt
+       #+ecl  ext:interactive-interrupt
+        ()
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
@@ -340,7 +346,9 @@
          (block this-loop!
                 (loop for value! across ,the-vector
                       do (progn (incf index!) (block this-pass! ,@body)))))
-       (sb-sys:interactive-interrupt ()
+      (#+sbcl sb-sys:interactive-interrupt
+       #+ecl  ext:interactive-interrupt
+        ()
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
@@ -355,7 +363,9 @@
            (block this-loop!
               (loop for value! = (read-line ,instream nil)
                     while value! do (progn (incf index!) (block this-pass! ,@body)))))
-       (sb-sys:interactive-interrupt ()
+      (#+sbcl sb-sys:interactive-interrupt
+       #+ecl  ext:interactive-interrupt
+        ()
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
@@ -373,7 +383,9 @@
                            (setq key! (car ,tmp))
                            (setq value! (cdr ,tmp))
                            (block this-pass! ,@body)))))
-       (sb-sys:interactive-interrupt ()
+      (#+sbcl sb-sys:interactive-interrupt
+       #+ecl  ext:interactive-interrupt
+        ()
          (die "~%Loop aborted. Bailing out.~%")))))
 
 
@@ -391,7 +403,9 @@
                     while value!
                     do (progn (incf index!)
                               (block this-pass! ,@body)))))
-     (sb-sys:interactive-interrupt ()
+      (#+sbcl sb-sys:interactive-interrupt
+       #+ecl  ext:interactive-interrupt
+        ()
          (die "~%Loop aborted. Bailing out.~%"))))
 
 
@@ -439,9 +453,10 @@
    Simple wrapper around `(loop (progn ,@body))`"
   `(handler-case
      (block nil (loop (progn ,@body)))
-     (sb-sys:interactive-interrupt ()
-        (die "~%Loop aborted. Bailing out.~%"))))
-
+    (#+sbcl sb-sys:interactive-interrupt
+     #+ecl  ext:interactive-interrupt
+      ()
+       (die "~%Loop aborted. Bailing out.~%"))))
 
 ;---------------------------------------------------------;
 
@@ -912,8 +927,8 @@
   (cond ((alistp this)        (cdr (assoc that this :test *clix-curly-test*)))
         (t                    (nth that this))))
 
-(defmethod get-at ((this simple-vector) that)
-  (svref this that))
+; (defmethod get-at ((this simple-vector) that)
+;   (svref this that))
 
 (defmethod get-at ((this vector) that)
   (aref this that))
@@ -1144,7 +1159,7 @@
       (setq counter (mod counter 4))
       (let ((rune (case counter
                     (0  "-")
-                    (1  (fn "~C" #\Backslash))
+                    (1  "\\")
                     (2  "|")
                     (t  "/"))))
         (format t "~A" rune)
@@ -1236,10 +1251,10 @@
 (defmacro λ (&body body)
   `(lambda ,@body))
 
-(defmacro octets->string (&rest everything)
-  `(sb-ext:octets-to-string ,@everything))
+#+sbcl  (defmacro octets->string (&rest everything)
+          `(sb-ext:octets-to-string ,@everything))
 
-(defmacro string->octets (&rest everything)
+#+sbcl  (defmacro string->octets (&rest everything)
   `(sb-ext:string-to-octets ,@everything))
 
 (defmacro make-octet-vector (n)
@@ -1296,27 +1311,27 @@
 
 
 ; REALLY LOOK INTO THIS BECAUSE THERE ARE A LOT OF WARNINGS AND IT SUCKS
-(defun clix-log-just-echo (stream char arg)
-  ;;;;;; HOW UNHYGENIC IS THIS???!!
-  (declare (ignore char))
-  (let ((sexp               (read stream t))
-    ;       (thetime            (get-universal-time))
-    ;       (thereturnvalue     nil)
-    ;       (thetimingresults   nil))
-      `(progn
-         (with-a-file *clix-log-file* :a
-           (format t "~S~%" ',sexp)
-           (format stream! "~%λ ~S~%" ',sexp)
-           (let* ((daoutputstream   (make-string-output-stream))
-                  (*trace-output*   daoutputstream)
-                  (thereturnvalue   (progn (time ,sexp))))
-             (finish-output stream!)
-             ,thereturnvalue))))))
+; (defun clix-log-just-echo (stream char arg)
+;   ;;;;;; HOW UNHYGENIC IS THIS???!!
+;   (declare (ignore char))
+;   (let ((sexp               (read stream t))
+;     ;       (thetime            (get-universal-time))
+;     ;       (thereturnvalue     nil)
+;     ;       (thetimingresults   nil))
+;       `(progn
+;          (with-a-file *clix-log-file* :a
+;            (format t "~S~%" ',sexp)
+;            (format stream! "~%λ ~S~%" ',sexp)
+;            (let* ((daoutputstream   (make-string-output-stream))
+;                   (*trace-output*   daoutputstream)
+;                   (thereturnvalue   (progn (time ,sexp))))
+;              (finish-output stream!)
+;              ,thereturnvalue))))))
 
 
 (defun clix-log (stream char arg)
   (cond ((= *clix-log-level* 2)    (clix-log-verbose   stream char arg))
-        ((= *clix-log-level* 1)    (clix-log-just-echo stream char arg))
+        ; ((= *clix-log-level* 1)    (clix-log-just-echo stream char arg))
         (                          nil)))
 
 
