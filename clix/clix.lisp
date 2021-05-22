@@ -17,8 +17,9 @@
            :*clix-log-file*   :*whitespaces*
            :+red-bold+        :+green-bold+       :+yellow-bold+
            :+blue-bold+       :+magenta-bold+     :+cyan-bold+
-           :+reset-terminal-color+                :green
-           :red               :yellow             :cyan
+           :+reset-terminal-color+
+           :magenta           :red                :yellow
+           :green             :cyan               :blue
            :*clix-zsh*        :with-gensyms       :mac
            :nil!              :aif                :it!
            :alambda           :self!              :get-size
@@ -112,18 +113,23 @@
 
 (defvar +ansi-escape-up+        (format nil "~c[1A" #\ESC))
 (defvar +ansi-escape-left-all+  (format nil "~c[500D" #\ESC))
-(defvar +ansi-escape-left-one+ (format nil "~c[1D" #\ESC))
+(defvar +ansi-escape-left-one+  (format nil "~c[1D" #\ESC))
 
 (defun do-with-color (acolor thestring &rest everything)
   (apply #'format nil
          (format nil "~A~A~A" acolor thestring +reset-terminal-color+)
          everything))
 
-(defun green  (thestring &rest things) (apply #'do-with-color +green-bold+ thestring things))
-(defun red    (thestring &rest things) (apply #'do-with-color +red-bold+ thestring things))
-(defun yellow (thestring &rest things) (apply #'do-with-color +yellow-bold+ thestring things))
-(defun cyan   (thestring &rest things) (apply #'do-with-color +cyan-bold+ thestring things))
+(defmacro make-color-fun (thename acolor)
+  `(defun ,thename (thestring &rest things)
+     (apply #'do-with-color ,acolor thestring things)))
 
+(make-color-fun magenta +magenta-bold+)
+(make-color-fun red     +red-bold+)
+(make-color-fun yellow  +yellow-bold+)
+(make-color-fun green   +green-bold+)
+(make-color-fun cyan    +cyan-bold+)
+(make-color-fun blue    +blue-bold+)
 
 
 (defparameter *clix-zsh* "/usr/local/bin/zsh")
