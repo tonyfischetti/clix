@@ -71,7 +71,7 @@
 
 
 ;---------------------------------------------------------;
-; formatting
+; formatting ---------------------------------------------;
 
 (defmacro fn (&rest everything)
   `(format nil ,@everything))
@@ -86,14 +86,20 @@
 
 
 ;---------------------------------------------------------;
-; parameters
+; parameters and colors ----------------------------------;
 
-(defparameter *clix-output-stream* *terminal-io*)
-(defparameter *clix-log-level* 2)
-(defparameter *clix-log-file* "clix-log.out")
-(defparameter *clix-curly-test* #'equal)
+(defparameter *clix-output-stream*    *terminal-io*)
+(defparameter *clix-log-level*        2)
+(defparameter *clix-log-file*         "clix-log.out")
+(defparameter *clix-curly-test*       #'equal)
+(defparameter *clix-external-format*  :UTF-8)
+(defparameter *clix-zsh*              "/usr/local/bin/zsh")
 
-(defparameter *clix-external-format* :UTF-8)
+(defvar *unix-epoch-difference*
+  (encode-universal-time 0 0 0 1 1 1970 0))
+
+(defvar *whitespaces* '(#\Space #\Newline #\Backspace #\Tab
+                        #\Linefeed #\Page #\Return #\Rubout))
 
 
 (defun make-ansi-escape (anum &optional (decoration 'bold))
@@ -131,20 +137,11 @@
 (make-color-fun cyan    +cyan-bold+)
 (make-color-fun blue    +blue-bold+)
 
-
-(defparameter *clix-zsh* "/usr/local/bin/zsh")
-
-(defvar *unix-epoch-difference*
-  (encode-universal-time 0 0 0 1 1 1970 0))
-
-(defvar *whitespaces* '(#\Space #\Newline #\Backspace #\Tab
-                        #\Linefeed #\Page #\Return #\Rubout))
-
 ;---------------------------------------------------------;
 
 
 ;---------------------------------------------------------;
-; Some utilities
+; Some utilities -----------------------------------------;
 
 ; Stolen from "Practical Common Lisp"
 (defmacro with-gensyms ((&rest names) &body body)
@@ -228,6 +225,10 @@
 
 ; ------------------------------------------------------- ;
 
+
+;---------------------------------------------------------;
+; Error handling -----------------------------------------;
+
 (defun die (message &key (status 1) (red-p t))
   "Prints MESSAGE to *ERROR-OUTPUT* and quits with a STATUS (default 1)"
   (format *error-output* "~A~A~A~%" (if red-p +red-bold+ "")
@@ -235,7 +236,6 @@
                                     (if red-p +reset-terminal-color+ ""))
   #+clisp (ext:exit status)
   #+sbcl  (sb-ext:quit :unix-status status))
-
 
 (defmacro or-die ((message &key (errfun #'die)) &body body)
   "anaphoric macro that binds ERROR! to the error
@@ -248,7 +248,6 @@
        ,@body)
      (error (error!)
        (funcall ,errfun (format nil "~A" ,message)))))
-
 
 (defmacro or-do (orthis &body body)
   "anaphoric macro that binds ERROR! to the error.
@@ -263,12 +262,15 @@
   "Macro to check if any of the supplied arguments are null"
   (let ((whole (cons avar therest)))
     `(loop for i in ',whole
-           do (unless (eval i) (die (format nil "Fatal error: ~A is null" i))))))
+           do (unless (eval i)
+                (die (format nil "Fatal error: ~A is null" i))))))
+
+;---------------------------------------------------------;
 
 
+;---------------------------------------------------------;
+; for-each and friends  ----------------------------------;
 
-; ;---------------------------------------------------------;
-; for-each and friends
 (declaim (inline progress))
 (defun progress (index limit &key (interval 1) (where *error-output*) (newline-p t))
   (when (= 0 (mod index interval))
@@ -301,8 +303,7 @@
                     while value! do (progn (incf index!) (block this-pass! ,@body))))))
       (#+sbcl sb-sys:interactive-interrupt
        #+ecl  ext:interactive-interrupt
-        ()
-         (die "~%Loop aborted. Bailing out.~%")))))
+        () (die "~%Loop aborted. Bailing out.~%")))))
 
 
 (defmacro for-each/list (a-thing &body body)
@@ -319,8 +320,7 @@
                   (block this-pass! ,@body))))
       (#+sbcl sb-sys:interactive-interrupt
        #+ecl  ext:interactive-interrupt
-        ()
-         (die "~%Loop aborted. Bailing out.~%")))))
+        () (die "~%Loop aborted. Bailing out.~%")))))
 
 
 (defmacro for-each/hash (a-thing &body body)
@@ -338,8 +338,7 @@
                                 (block this-pass! ,@body)))))
       (#+sbcl sb-sys:interactive-interrupt
        #+ecl  ext:interactive-interrupt
-        ()
-         (die "~%Loop aborted. Bailing out.~%")))))
+        () (die "~%Loop aborted. Bailing out.~%")))))
 
 
 (defmacro for-each/vector (a-thing &body body)
@@ -354,8 +353,7 @@
                       do (progn (incf index!) (block this-pass! ,@body)))))
       (#+sbcl sb-sys:interactive-interrupt
        #+ecl  ext:interactive-interrupt
-        ()
-         (die "~%Loop aborted. Bailing out.~%")))))
+        () (die "~%Loop aborted. Bailing out.~%")))))
 
 
 ; USE UNWIND-PROTECT?
@@ -371,8 +369,7 @@
                     while value! do (progn (incf index!) (block this-pass! ,@body)))))
       (#+sbcl sb-sys:interactive-interrupt
        #+ecl  ext:interactive-interrupt
-        ()
-         (die "~%Loop aborted. Bailing out.~%")))))
+        () (die "~%Loop aborted. Bailing out.~%")))))
 
 
 (defmacro for-each/alist (aalist &body body)
@@ -391,8 +388,7 @@
                            (block this-pass! ,@body)))))
       (#+sbcl sb-sys:interactive-interrupt
        #+ecl  ext:interactive-interrupt
-        ()
-         (die "~%Loop aborted. Bailing out.~%")))))
+        () (die "~%Loop aborted. Bailing out.~%")))))
 
 
 (defmacro for-each/call (aclosure &body body)
@@ -411,8 +407,7 @@
                               (block this-pass! ,@body)))))
       (#+sbcl sb-sys:interactive-interrupt
        #+ecl  ext:interactive-interrupt
-        ()
-         (die "~%Loop aborted. Bailing out.~%"))))
+        () (die "~%Loop aborted. Bailing out.~%"))))
 
 
 (defmacro for-each (a-thing &body body)
@@ -461,15 +456,13 @@
      (block nil (loop (progn ,@body)))
     (#+sbcl sb-sys:interactive-interrupt
      #+ecl  ext:interactive-interrupt
-      ()
-       (die "~%Loop aborted. Bailing out.~%"))))
+      () (die "~%Loop aborted. Bailing out.~%"))))
 
 ;---------------------------------------------------------;
 
 
-
-; --------------------------------------------------------------- ;
-; cl-ppcre wrappers where the arguments are re-arranged to make sense to me
+;---------------------------------------------------------;
+; regular expressions / cl-ppcre wrappers ----------------;
 
 (defmacro re-compile (&rest everything)
   `(cl-ppcre:create-scanner ,@everything))
@@ -544,18 +537,16 @@
   "Alias to str-extract"
   `(str-extract ,@everything))
 
-
-; --------------------------------------------------------------- ;
+; ------------------------------------------------------- ;
 
 
 ;---------------------------------------------------------;
-; convenience
+; convenience functions and macros  ----------------------;
 
 (defmacro aif (test then &optional else)
   "Like IF. IT is bound to TEST."
   `(let ((it! ,test))
      (if it! ,then ,else)))
-
 
 ; IS IT MAYBE BIGGER THAN IT NEEDS TO BE BECAUSE MULTIBYTE?
 (defun slurp (path)
@@ -584,7 +575,8 @@
 
 #+sbcl
 (defun zsh (acommand &key (dry-run nil)
-                          (err-fun #'(lambda (code stderr) (error (format nil "~A (~A)" stderr code))))
+                          (err-fun #'(lambda (code stderr)
+                                       (error (format nil "~A (~A)" stderr code))))
                           (echo nil)
                           (enc *clix-external-format*)
                           (in  t)
@@ -621,7 +613,6 @@
                     (strip (get-output-stream-string outs)))
                   (strip (get-output-stream-string errs))
                   retcode))))))
-
 
 (defun get-size (afile &key (just-bytes nil))
   "Uses `du` to return just the size of the provided file.
@@ -677,12 +668,10 @@
                                      message
                                      (if yellow-p +reset-terminal-color+ "")))
 
-
 (defun alistp (something)
   "Test is something is an alist"
   (and (listp something)
        (every #'consp something)))
-
 
 (defun cmdargs ()
   "A multi-implementation function to return argv (program name is CAR)"
@@ -692,15 +681,6 @@
    #+LISPWORKS system:*line-arguments-list*
    #+CMU extensions:*command-line-words*
    nil))
-
-
-(defun clear-screen ()
-  "A multi-implementation function to clear the terminal screen"
-   #+clisp    (shell "clear")
-   #+ecl      (si:system "clear")
-   #+sbcl     (sb-ext:run-program "/bin/sh" (list "-c" "clear") :input nil :output *standard-output*)
-   #+clozure  (ccl:run-program "/bin/sh" (list "-c" "clear") :input nil :output *standard-output*))
-
 
 (defmacro -<> (expr &rest forms)
   "Threading macro (put <> where the argument should be)
@@ -717,13 +697,12 @@
 
 
 ;---------------------------------------------------------;
-; Stolen or inspired by https://github.com/vseloved/rutils/
+; stolen or inspired by gh:vseloved/rutils ---------------;
 
 (defmacro eval-always (&body body)
   "Wrap BODY in eval-when with all keys (compile, load and execute) mentioned."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      ,@body))
-
 
 (defun str-join (delim strings)
   "Join STRINGS with DELIM."
@@ -737,7 +716,6 @@
             (if (minusp start) (+ len start) start)
             (if (and end (minusp end)) (+ len end) end))))
 
-
 (defun interpose (separator list)
   "Returns a sequence of the elements of SEQUENCE separated by SEPARATOR."
   (labels ((rec (s acc)
@@ -746,7 +724,6 @@
                                       (list separator (car s))))
                   acc)))
     (cdr (rec list nil))))
-
 
 (defun print-hash-table (ht &optional (stream *standard-output*))
   "Pretty print hash-table HT to STREAM."
@@ -779,14 +756,11 @@
                           (princ "} " stream)))
   ht)
 
-; --------------------------------------------------------------- ;
+;---------------------------------------------------------;
 
 
-
-
-
-; --------------------------------------------------------------- ;
-; HTML/XML stuff
+; ------------------------------------------------------- ;
+; HTML/XML stuff ---------------------------------------- ;
 
 (defmacro request (&rest everything)
   `(drakma:http-request ,@everything))
@@ -821,12 +795,13 @@
 
 (abbr xpath-string xpath:string-value)
 
-; --------------------------------------------------------------- ;
+; ------------------------------------------------------- ;
 
 
 
 ; ------------------------------------------------------- ;
-; experimental reader macros
+; experimental reader macros ---------------------------- ;
+
 (defun ignore-the-errors-wrapper (stream char arg)
   (declare (ignore char))
   (declare (ignore arg))
@@ -834,7 +809,6 @@
     `(ignore-errors ,sexp)))
 
 (set-dispatch-macro-character #\# #\? #'ignore-the-errors-wrapper)
-
 
 (defun |•-reader| (stream char)
   "Alternate double quote"
@@ -848,7 +822,6 @@
 
 (set-macro-character #\Bullet #'|•-reader|)
 
-
 (defun |ensure-not-null| (stream char)
   "Reader macro to check if symbol is null,
    otherwise, pass it on"
@@ -860,7 +833,6 @@
             (error "its null")))))
 
 (set-macro-character #\Ø #'|ensure-not-null|)
-
 
 (defun |if-null->this| (stream char)
   "Reader macro that takes two s-expressions.
@@ -874,7 +846,6 @@
        (if ,res ,res ,replacement))))
 
 (set-macro-character #\? #'|if-null->this|)
-
 
 (defun |«-reader| (stream char)
   "Examples:
@@ -915,7 +886,6 @@
            `(if ,before ,before ,after)))))))
 
 (set-macro-character #\« #'|«-reader|)
-
 
 ; universal indexing operator syntax
 (defun |{-reader| (stream char)
@@ -977,18 +947,20 @@
 (defmacro clix-get (x &rest rest)
   `(suc-apply get-at ,x ,@rest))
 
+; ------------------------------------------------------- ;
 
-; --------------------------------------------------------------- ;
 
+; ------------------------------------------------------- ;
+; what's the deal with T I M E ? ------------------------ ;
 
-; --------------------------------------------------------------- ;
-; time
 (defun universal->unix-time (universal-time)
-  "Converts universal (common lisp time from `(get-universal-time)` to UNIX time"
+  "Converts universal (common lisp time from `(get-universal-time)`
+   to UNIX time"
   (- universal-time *unix-epoch-difference*))
 
 (defun unix->universal-time (unix-time)
-  "Converts UNIX time to  universal (common lisp time from `(get-universal-time)`"
+  "Converts UNIX time to universal (common lisp time from
+   `(get-universal-time)`"
   (+ unix-time *unix-epoch-difference*))
 
 (defun get-unix-time ()
@@ -1009,12 +981,10 @@
           (format nil "~d-~2,'0d-~2,'0d" year month date)
           (format nil "~d~A~2,'0d~A~2,'0d" hour TIME-SEP minute TIME-SEP second))))))
 
-
 (defun get-current-time (&key (just-date nil) (just-time nil) (time-sep ":"))
   "Uses `make-pretty-time` to get the current datetime"
   (make-pretty-time (-<> (get-universal-time) universal->unix-time)
                     :just-date just-date :just-time just-time :time-sep time-sep))
-
 
 (defmacro with-time (&body aform)
   "Anaphoric macro that executes the car of the body and
@@ -1042,16 +1012,14 @@
 
 
 
+; ------------------------------------------------------- ;
+; more useful macros and functions ---------------------- ;
 
-
-; --------------------------------------------------------------- ;
-; useful macros / functions
 (defmacro debug-these (&rest therest)
   """
   Macro that takes an arbitrary number of arguments,
   prints the symbol, and then prints it's evaluated value
   (for debugging)
-  ; https://www.reddit.com/r/Common_Lisp/comments/d0agxj/question_about_macros_and_lexical_scoping/
   """
   (flet ((debug (this)
       `(format *error-output* "~20S -> ~S~%" ',this ,this)))
@@ -1080,7 +1048,6 @@
                               :external-format *clix-external-format*)
        ,@body)))
 
-
 (defun rnorm (n &key (mean 0) (sd 1))
   "Makes a list of `n` random variates with mean of `mean` and
    standard deviation of `sd`"
@@ -1098,13 +1065,16 @@
       ((eq :alist what)  (join-with-newlines (loop for i in anlist
                                                    for key = (car i)
                                                    for val = (cdr i)
-                                                   collect (join-with-sep (list key val)))))
+                                                   collect (join-with-sep
+                                                             (list key val)))))
       ((eq :listoflists what)
                          (join-with-newlines (loop for i in anlist
                                                    collect (join-with-sep i))))
-      ((eq :hash what)   (join-with-newlines (loop for key being the hash-keys in anlist
+      ((eq :hash what)   (join-with-newlines (loop for key being the hash-keys
+                                                     in anlist
                                                    using (hash-value val)
-                                                   collect (join-with-sep (list key val)))))
+                                                   collect (join-with-sep
+                                                             (list key val)))))
       (t                 (error "unsupported type")))))
 
 
@@ -1116,6 +1086,20 @@
     (let ((tmp (helper body)))
      `(progn  ,@tmp))))
 
+; ------------------------------------------------------- ;
+
+
+; ------------------------------------------------------- ;
+; terminal things / terminal manipulation --------------- ;
+
+(defun clear-screen ()
+  "A multi-implementation function to clear the terminal screen"
+   #+clisp    (shell "clear")
+   #+ecl      (si:system "clear")
+   #+sbcl     (sb-ext:run-program "/bin/sh" (list "-c" "clear")
+                                  :input nil :output *standard-output*)
+   #+clozure  (ccl:run-program "/bin/sh" (list "-c" "clear")
+                               :input nil :output *standard-output*))
 
 (defun get-terminal-columns ()
   "Retrieves the number of columns in terminal by querying
@@ -1236,13 +1220,11 @@
                      tmpvar) :echo nil)))
       (if (string= response "") nil response))))
 
-; --------------------------------------------------------------- ;
+; ------------------------------------------------------- ;
 
 
-
-
-; --------------------------------------------------------------- ;
-; other abbreviations and shortcuts
+; ------------------------------------------------------- ;
+; other abbriviations and shortcuts --------------------- ;
 
 (abbr alist->hash-table alexandria:alist-hash-table)
 (abbr hash-table->alist alexandria:hash-table-alist)
@@ -1254,14 +1236,15 @@
   (with-a-file afile :r
     (yason:parse stream!)))
 
-
 (defmacro λ (&body body)
   `(lambda ,@body))
 
-#+sbcl  (defmacro octets->string (&rest everything)
-          `(sb-ext:octets-to-string ,@everything))
+#+sbcl
+(defmacro octets->string (&rest everything)
+  `(sb-ext:octets-to-string ,@everything))
 
-#+sbcl  (defmacro string->octets (&rest everything)
+#+sbcl
+(defmacro string->octets (&rest everything)
   `(sb-ext:string-to-octets ,@everything))
 
 (defmacro make-octet-vector (n)
@@ -1281,12 +1264,13 @@
 ; (abbr getset# getsethash)
 ; (abbr rem# remhash)
 
-; --------------------------------------------------------------- ;
+; ------------------------------------------------------- ;
 
 
 
 ;---------------------------------------------------------;
-; Experimental logging and reader macros
+; experimental logging and reader macros ---------------- ;
+
 (defun prettify-time-output (thetimeoutput)
   (subseq thetimeoutput 0 (- (length thetimeoutput) 4)))
 
@@ -1294,7 +1278,8 @@
 (defun clix-log-verbose (stream char arg)
   ;;;;;; HOW UNHYGENIC IS THIS???!!
   (declare (ignore char))
-  (multiple-value-bind (second minute hour date month year day-of-week dst-p tz) (get-decoded-time)
+  (multiple-value-bind (second minute hour date month year day-of-week dst-p tz)
+                       (get-decoded-time)
     (let ((sexp               (read stream t))
           (thetime            (get-universal-time))
           (thereturnvalue     nil)
@@ -1310,7 +1295,9 @@
            (let ((daoutputstream (make-string-output-stream)))
              (let ((*trace-output* daoutputstream))
                (setq thereturnvalue (progn (time ,sexp))))
-                 (setq thetimingresults (prettify-time-output (get-output-stream-string daoutputstream))))
+                 (setq thetimingresults
+                       (prettify-time-output
+                         (get-output-stream-string daoutputstream))))
            (format stream! "RETURNED:~%~A~%" thereturnvalue)
            (format stream! "~%~A~%--------------------~%~%~%" thetimingresults)
            (finish-output stream!)
@@ -1344,13 +1331,12 @@
 
 (set-dispatch-macro-character #\# #\! #'clix-log)
 
-; --------------------------------------------------------------- ;
+;---------------------------------------------------------;
 
 
-
-; --------------------------------------------------------------- ;
-; very hacky "interface" to R for emergencies
-; because LITERALLY NOTHING ELSE WORKS!
+;-------------------------------------------------------- ;
+; very hacky "interface" to R for emergencies ----------- ;
+; because LITERALLY NOTHING ELSE WORKS! ----------------- ;
 
 (defun r-get (acommand &key (type *read-default-float-format*) (what :raw))
   "Runs a command through R and returns the result.
@@ -1386,5 +1372,6 @@
   (let ((thecom (gensym)))
     `(let ((,thecom (str-join ";" ',body)))
        (r-get ,thecom :what ,what))))
+
 ; --------------------------------------------------------------- ;
 
