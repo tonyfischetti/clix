@@ -1,6 +1,15 @@
 ; --------------------------------------------------------------- ;
 ; cli argument macro
 
+(defun string->char-list (astring)
+  (map 'list #'string astring))
+
+(defun %ext-flag-match-p (astring)
+  (let ((as-chars (coerce astring 'list)))
+    (and (char= (car as-chars) #\-)
+         (> (length as-chars) 2)
+         (every #'alpha-char-p (cdr as-chars)))))
+
 (defmacro def-cli-args (script-name after-name description &body body)
   (let* ((switches       (mapcar #'second    body))
          (longswitches   (mapcar #'third     body))
@@ -34,16 +43,14 @@
            (unless (null args!)
              (let ((current (car args!)))
                (cond
-                 ((cl-ppcre:scan "^-\\w\\w+$" current)
-                            (process-args! (append
-                                             (mapcar
-                                               (lambda (x) (format nil "-~A" x))
-                                               (cdr (cl-ppcre:split "" current)))
-                                             (cdr args))))
+                 ((%ext-flag-match-p current)
+                   (process-args! (append
+                                    (mapcar (lambda (x) (format nil "-~A" x))
+                                            (cdr (string->char-list current)))
+                                    (cdr args))))
                  ,@tmp
-                 (t (progn (setq bare-args! (reverse (cons current bare-args!))) (process-args! (cdr args!))))
-                 )
-               ))))))))
-
-;---------------------------------------------------------;
+                 (t
+                   (progn
+                     (setq bare-args! (reverse (cons current bare-args!)))
+                     (process-args! (cdr args!)))))))))))))
 

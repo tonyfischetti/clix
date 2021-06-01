@@ -19,14 +19,14 @@
                ; https://gitlab.common-lisp.net/alexandria/alexandria
                :alexandria
 
-               ; HTTP client of choicee
+               ; HTTP client of choice
                ; https://edicl.github.io/drakma/
                :drakma
 
                ; XML parser of choice
                ; https://common-lisp.net/project/cxml/
                :cxml
-            
+
                ; Plexippus XPATH library
                ; https://common-lisp.net/project/plexippus-xpath/
                :xpath
