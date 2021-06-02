@@ -1,24 +1,18 @@
 
+## SBCL COMPILATION
 export CFLAGS="-O2 -march=native -mtune=native -pipe";
-
-sh make.sh --prefix=/usr/local --dynamic-space-size=15Gb --fancy --with-sb-core-compression
-
+sh make.sh --prefix=/usr/local --dynamic-space-size=<<15Gb>> --fancy --with-sb-core-compression
 cd doc/manual && make
 cd tests && sh ./run-tests.sh
 sudo sh install.sh
+
 
 curl -O https://beta.quicklisp.org/quicklisp.lisp
 sbcl --load quicklisp.lisp
 (quicklisp-quickstart:install)
 
-git clone https://github.com/tonyfischetti/clix.git ~/.sbcl
-ln -s ~/.sbcl/.sbclrc ~/.sbclrc
-ln -s ~/.sbcl/clix ~/quicklisp/local-projects/clix
-ln -s ~/.sbcl/linedit/ ~/quicklisp/local-projects/linedit
-
-sbcl --no-linedit
+sbcl --no-linedit --without-clix
 (ql:register-local-projects)
-
 
 RESET THE EXPORTS!!!!!!!!
 The compiler export is in linedit.asd (or something)
