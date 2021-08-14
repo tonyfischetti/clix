@@ -15,3 +15,4 @@ ln -s ~/.lisp/linedit/ ~/quicklisp/local-projects/linedit
 ln -s ~/.lisp/other-packages/cl-repl/ ~/quicklisp/local-projects/cl-repl
 ln -s ~/.lisp/other-packages/cl-tui/ ~/quicklisp/local-projects/cl-tui
 ```
+
