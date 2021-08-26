@@ -1,7 +1,7 @@
 
+(push :coreutils *features*)
 
 #-quicklisp (load "~/quicklisp/setup.lisp")
-
 
 (setf sb-int:*repl-prompt-fun* (lambda (stream) (format stream "~%λ ")))
 
