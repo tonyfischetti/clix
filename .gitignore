@@ -1,3 +1,4 @@
 .DS_Store
 pluto-sbcl.core
 pluto-clisp.mem
+*.so
