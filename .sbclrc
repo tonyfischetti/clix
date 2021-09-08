@@ -17,8 +17,8 @@
 (if (member "--without-pluto" sb-ext:*posix-argv* :test 'equal)
   (setf sb-ext:*posix-argv* (remove "--without-pluto" sb-ext:*posix-argv* :test 'equal))
   (progn
-    (ql:quickload :charon :silent t)
-    (use-package :charon)))
+    (ql:quickload :styx :silent t)
+    (use-package :styx)))
 
 (when (member "--with-cl-repl" sb-ext:*posix-argv* :test 'equal)
   (setf sb-ext:*posix-argv* (remove "--with-cl-repl" sb-ext:*posix-argv* :test 'equal))
