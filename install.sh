@@ -21,7 +21,7 @@ sbcl --no-linedit --without-pluto --eval "(sb-ext:exit)"
 sbcl --without-pluto --eval "(sb-ext:exit)"
 sbcl --eval "(sb-ext:exit)"
 
-# zsh -c ~/.zsh/bin/update-lisp-cores.sh
+zsh -c ~/.zsh/bin/update-lisp-cores.sh
 
 rm ~/quicklisp.lisp
 
