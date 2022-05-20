@@ -1,5 +1,6 @@
 #!/bin/bash
 
+cd $HOME
 curl -O https://beta.quicklisp.org/quicklisp.lisp
 sbcl --load quicklisp.lisp --eval "(quicklisp-quickstart:install)"
 ln -s ~/.lisp/.sbclrc ~/.sbclrc
