@@ -1,7 +1,7 @@
 #!/bin/bash
 
 cd $HOME
-curl -O https://beta.quicklisp.org/quicklisp.lisp
+cp ~/.lisp/quicklisp.lisp ./
 sbcl --load quicklisp.lisp --eval "(quicklisp-quickstart:install)"
 ln -s ~/.lisp/.sbclrc ~/.sbclrc
 ln -s ~/.lisp/.clisprc.lisp ~/.clisprc.lisp
@@ -22,4 +22,6 @@ sbcl --without-pluto --eval "(sb-ext:exit)"
 sbcl --eval "(sb-ext:exit)"
 
 # zsh -c ~/.zsh/bin/update-lisp-cores.sh
+
+rm ~/quicklisp.lisp
 
