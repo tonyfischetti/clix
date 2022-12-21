@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euxo pipefail
+
 cd $HOME
 cp ~/.lisp/quicklisp.lisp ./
 sbcl --load quicklisp.lisp --eval "(quicklisp-quickstart:install)"
